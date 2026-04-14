@@ -1,71 +1,97 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  ShoppingBag,
-  Users,
-  DollarSign,
-  TrendingUp,
-  Calendar,
-  Clock,
+  ShoppingBag, Users, DollarSign, TrendingUp, Calendar, Clock,
+  BookOpen, Wheat, ArrowRight, AlertCircle,
 } from 'lucide-react'
+import Link from 'next/link'
+import { formatCurrency, calculateRecipeTotalCost, type Ingredient, type RecipeItem } from '@/lib/utils'
 
 interface DashboardData {
   totalOrders: number
   totalCustomers: number
   totalRevenue: number
-  totalIngredients: number
-  recentOrders: Array<{
-    id: string
-    title: string
-    status: string
-    sale_price: number
-    event_date: string
-    customer_name?: string
+  totalRecipes: number
+  pendingOrders: Array<{
+    id: string; title: string; status: string; sale_price: number; event_date: string
+    customers?: { name: string }
   }>
   upcomingTasks: Array<{
-    id: string
-    title: string
-    status: string
-    due_at: string
+    id: string; title: string; status: string; due_at: string
+    orders?: { title: string }
   }>
+  recentRecipes: Array<{
+    id: string; name: string; category: string; items: RecipeItem[]
+  }>
+  monthlyIncome: number
+  monthlyExpense: number
+  settings: {
+    business_name: string; monthly_order_goal: number
+  } | null
 }
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData>({
-    totalOrders: 0,
-    totalCustomers: 0,
-    totalRevenue: 0,
-    totalIngredients: 0,
-    recentOrders: [],
-    upcomingTasks: [],
+    totalOrders: 0, totalCustomers: 0, totalRevenue: 0, totalRecipes: 0,
+    pendingOrders: [], upcomingTasks: [], recentRecipes: [],
+    monthlyIncome: 0, monthlyExpense: 0, settings: null,
   })
+  const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
-  const loadData = useCallback(async () => {
+  const ingredientsMap = useMemo(() => {
+    const m = new Map<string, Ingredient>()
+    ingredients.forEach(i => m.set(i.id, i))
+    return m
+  }, [ingredients])
+
+  const load = useCallback(async () => {
     try {
-      const [ordersRes, customersRes, ingredientsRes, recentOrdersRes, tasksRes] = await Promise.all([
+      const now = new Date()
+      const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+      const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]
+
+      const [
+        ordersRes, customersRes, recipesRes, ingredientsRes,
+        pendingOrdersRes, tasksRes, recentRecipesRes,
+        monthIncomeRes, monthExpenseRes, settingsRes,
+      ] = await Promise.all([
         supabase.from('orders').select('id, sale_price', { count: 'exact' }),
         supabase.from('customers').select('id', { count: 'exact' }),
-        supabase.from('ingredients').select('id', { count: 'exact' }),
-        supabase.from('orders').select('id, title, status, sale_price, event_date, customer_id, customers(name)').order('event_date', { ascending: false }).limit(5),
-        supabase.from('production_tasks').select('id, title, status, due_at').order('due_at', { ascending: true }).limit(5),
+        supabase.from('recipes').select('id', { count: 'exact' }),
+        supabase.from('ingredients').select('*'),
+        supabase.from('orders').select('id, title, status, sale_price, event_date, customers(name)')
+          .in('status', ['pending', 'confirmed', 'in_progress'])
+          .order('event_date').limit(6),
+        supabase.from('production_tasks').select('id, title, status, due_at, orders(title)')
+          .in('status', ['todo', 'doing']).order('due_at').limit(5),
+        supabase.from('recipes').select('id, name, category, items').order('display_order').limit(4),
+        supabase.from('cash_entries').select('amount').eq('kind', 'income')
+          .gte('occurred_on', firstDayOfMonth).lte('occurred_on', lastDayOfMonth),
+        supabase.from('cash_entries').select('amount').eq('kind', 'expense')
+          .gte('occurred_on', firstDayOfMonth).lte('occurred_on', lastDayOfMonth),
+        supabase.from('bakery_settings').select('business_name, monthly_order_goal').limit(1).single(),
       ])
 
       const totalRevenue = ordersRes.data?.reduce((sum, o) => sum + (o.sale_price || 0), 0) || 0
+      const monthlyIncome = monthIncomeRes.data?.reduce((s, e) => s + (e.amount || 0), 0) || 0
+      const monthlyExpense = monthExpenseRes.data?.reduce((s, e) => s + (e.amount || 0), 0) || 0
 
+      setIngredients(ingredientsRes.data || [])
       setData({
         totalOrders: ordersRes.count || 0,
         totalCustomers: customersRes.count || 0,
         totalRevenue,
-        totalIngredients: ingredientsRes.count || 0,
-        recentOrders: (recentOrdersRes.data || []).map((o: Record<string, unknown>) => ({
-          ...o,
-          customer_name: (o.customers as Record<string, unknown>)?.name as string | undefined,
-        })) as DashboardData['recentOrders'],
-        upcomingTasks: (tasksRes.data || []) as DashboardData['upcomingTasks'],
+        totalRecipes: recipesRes.count || 0,
+        pendingOrders: (pendingOrdersRes.data || []) as unknown as DashboardData['pendingOrders'],
+        upcomingTasks: (tasksRes.data || []) as unknown as DashboardData['upcomingTasks'],
+        recentRecipes: (recentRecipesRes.data || []).map(r => ({ ...r, items: Array.isArray(r.items) ? r.items : [] })),
+        monthlyIncome,
+        monthlyExpense,
+        settings: settingsRes.data as DashboardData['settings'],
       })
     } catch (err) {
       console.error('Error loading dashboard:', err)
@@ -74,53 +100,37 @@ export default function DashboardPage() {
     }
   }, [supabase])
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
-
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+  useEffect(() => { load() }, [load])
 
   const formatDate = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })
-    } catch {
-      return dateStr
-    }
+    try { return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) }
+    catch { return dateStr }
   }
 
-  const getStatusBadge = (status: string) => {
-    const map: Record<string, string> = {
-      pending: 'badge-warning',
-      confirmed: 'badge-info',
-      in_progress: 'badge-brand',
-      completed: 'badge-success',
-      cancelled: 'badge-danger',
-      delivered: 'badge-success',
-      todo: 'badge-neutral',
-      doing: 'badge-warning',
-      done: 'badge-success',
-    }
-    return map[status] || 'badge-neutral'
+  const formatDatetime = (dateStr: string) => {
+    try { return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) }
+    catch { return dateStr }
   }
 
   const statusLabels: Record<string, string> = {
-    pending: 'Pendente',
-    confirmed: 'Confirmado',
-    in_progress: 'Em Produção',
-    completed: 'Concluído',
-    cancelled: 'Cancelado',
-    delivered: 'Entregue',
-    todo: 'A fazer',
-    doing: 'Fazendo',
-    done: 'Feito',
+    pending: 'Pendente', confirmed: 'Confirmado', in_progress: 'Em Produção',
+    completed: 'Concluído', cancelled: 'Cancelado', delivered: 'Entregue',
+    todo: 'A fazer', doing: 'Fazendo', done: 'Feito',
   }
+
+  const getStatusBadge = (s: string) => ({
+    pending: 'badge-warning', confirmed: 'badge-info', in_progress: 'badge-brand',
+    completed: 'badge-success', delivered: 'badge-success', cancelled: 'badge-danger',
+    todo: 'badge-neutral', doing: 'badge-warning', done: 'badge-success',
+  }[s] || 'badge-neutral')
+
+  const currentMonth = new Date().toLocaleDateString('pt-BR', { month: 'long' })
 
   if (loading) {
     return (
       <div className="page-container">
         <div className="stats-grid">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3, 4].map(i => (
             <div key={i} className="stat-card">
               <div className="skeleton" style={{ width: 48, height: 48, borderRadius: 12, marginBottom: 16 }} />
               <div className="skeleton" style={{ width: '60%', height: 28, marginBottom: 8 }} />
@@ -136,11 +146,19 @@ export default function DashboardPage() {
     <div className="page-container">
       <div className="page-header">
         <div>
-          <h1>Painel de Controle</h1>
-          <p>Visão geral da sua confeitaria</p>
+          <h1>
+            {data.settings?.business_name
+              ? `Olá, ${data.settings.business_name}! 👋`
+              : 'Painel de Controle'}
+          </h1>
+          <p>Visão geral da sua confeitaria • {currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1)}</p>
         </div>
+        <Link href="/dashboard/calculadora" className="btn btn-primary">
+          <DollarSign size={18} /> Calcular Preço
+        </Link>
       </div>
 
+      {/* KPI Cards */}
       <div className="stats-grid">
         <div className="stat-card">
           <div className="stat-icon"><ShoppingBag size={24} /></div>
@@ -150,58 +168,50 @@ export default function DashboardPage() {
         <div className="stat-card">
           <div className="stat-icon"><Users size={24} /></div>
           <div className="stat-value">{data.totalCustomers}</div>
-          <div className="stat-label">Clientes Cadastrados</div>
+          <div className="stat-label">Clientes</div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"><DollarSign size={24} /></div>
-          <div className="stat-value">{formatCurrency(data.totalRevenue)}</div>
+          <div className="stat-value" style={{ fontSize: data.totalRevenue > 99999 ? '1.25rem' : undefined }}>{formatCurrency(data.totalRevenue)}</div>
           <div className="stat-label">Receita Total</div>
         </div>
         <div className="stat-card">
           <div className="stat-icon"><TrendingUp size={24} /></div>
-          <div className="stat-value">{data.totalIngredients}</div>
-          <div className="stat-label">Ingredientes</div>
+          <div className="stat-value" style={{ fontSize: '1.25rem', color: (data.monthlyIncome - data.monthlyExpense) >= 0 ? 'var(--success-600)' : 'var(--danger-500)' }}>
+            {formatCurrency(data.monthlyIncome - data.monthlyExpense)}
+          </div>
+          <div className="stat-label">Saldo do Mês</div>
         </div>
       </div>
 
       <div className="grid-2">
-        {/* Recent Orders */}
+        {/* Pending Orders */}
         <div className="card">
           <div className="card-header">
             <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Calendar size={18} />
-              Pedidos Recentes
+              <AlertCircle size={18} style={{ color: 'var(--warning-500)' }} />
+              Pedidos Ativos
             </h3>
+            <Link href="/dashboard/pedidos" className="btn btn-ghost btn-sm">Ver todos <ArrowRight size={14} /></Link>
           </div>
           <div className="card-body" style={{ padding: 0 }}>
-            {data.recentOrders.length === 0 ? (
+            {data.pendingOrders.length === 0 ? (
               <div className="empty-state" style={{ padding: 40 }}>
                 <ShoppingBag size={40} style={{ color: 'var(--gray-300)', margin: '0 auto 12px' }} />
-                <p>Nenhum pedido encontrado</p>
+                <p>Nenhum pedido ativo</p>
               </div>
             ) : (
               <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Pedido</th>
-                    <th>Data</th>
-                    <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Valor</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Pedido</th><th>Data</th><th>Status</th><th style={{ textAlign: 'right' }}>Valor</th></tr></thead>
                 <tbody>
-                  {data.recentOrders.map((order) => (
+                  {data.pendingOrders.map(order => (
                     <tr key={order.id}>
                       <td>
                         <div style={{ fontWeight: 600 }}>{order.title}</div>
-                        <div className="text-xs text-muted">{order.customer_name}</div>
+                        <div className="text-xs text-muted">{order.customers?.name}</div>
                       </td>
                       <td className="text-sm">{formatDate(order.event_date)}</td>
-                      <td>
-                        <span className={`badge ${getStatusBadge(order.status)}`}>
-                          {statusLabels[order.status] || order.status}
-                        </span>
-                      </td>
+                      <td><span className={`badge ${getStatusBadge(order.status)}`}>{statusLabels[order.status] || order.status}</span></td>
                       <td className="text-right font-semibold">{formatCurrency(order.sale_price)}</td>
                     </tr>
                   ))}
@@ -211,55 +221,62 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Upcoming Tasks */}
-        <div className="card">
-          <div className="card-header">
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Clock size={18} />
-              Próximas Tarefas
-            </h3>
-          </div>
-          <div className="card-body" style={{ padding: 0 }}>
-            {data.upcomingTasks.length === 0 ? (
-              <div className="empty-state" style={{ padding: 40 }}>
-                <ListChecks size={40} style={{ color: 'var(--gray-300)', margin: '0 auto 12px' }} />
-                <p>Nenhuma tarefa pendente</p>
-              </div>
-            ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Tarefa</th>
-                    <th>Prazo</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.upcomingTasks.map((task) => (
-                    <tr key={task.id}>
-                      <td className="font-semibold">{task.title}</td>
-                      <td className="text-sm">{formatDate(task.due_at)}</td>
-                      <td>
-                        <span className={`badge ${getStatusBadge(task.status)}`}>
-                          {statusLabels[task.status] || task.status}
-                        </span>
-                      </td>
-                    </tr>
+        {/* Tasks + Quick Recipes */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Upcoming Tasks */}
+          <div className="card">
+            <div className="card-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Clock size={18} /> Produção Pendente</h3>
+              <Link href="/dashboard/producao" className="btn btn-ghost btn-sm">Ver <ArrowRight size={14} /></Link>
+            </div>
+            <div className="card-body" style={{ padding: 0 }}>
+              {data.upcomingTasks.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Nenhuma tarefa pendente ✅</div>
+              ) : (
+                <div style={{ padding: '4px 0' }}>
+                  {data.upcomingTasks.map(task => (
+                    <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 24px', borderBottom: '1px solid var(--border-light)' }}>
+                      <span className={`badge ${getStatusBadge(task.status)}`} style={{ minWidth: 60, textAlign: 'center' }}>{statusLabels[task.status]}</span>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="font-semibold text-sm truncate">{task.title}</div>
+                        <div className="text-xs text-muted">{task.orders?.title} • {formatDatetime(task.due_at)}</div>
+                      </div>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Recent Recipes with Cost */}
+          <div className="card">
+            <div className="card-header">
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><BookOpen size={18} /> Receitas</h3>
+              <Link href="/dashboard/receitas" className="btn btn-ghost btn-sm">Ver <ArrowRight size={14} /></Link>
+            </div>
+            <div className="card-body" style={{ padding: 0 }}>
+              {data.recentRecipes.length === 0 ? (
+                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Nenhuma receita cadastrada</div>
+              ) : (
+                <div style={{ padding: '4px 0' }}>
+                  {data.recentRecipes.map(recipe => {
+                    const cost = calculateRecipeTotalCost(recipe.items, ingredientsMap)
+                    return (
+                      <div key={recipe.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 24px', borderBottom: '1px solid var(--border-light)' }}>
+                        <div>
+                          <div className="font-semibold text-sm">{recipe.name}</div>
+                          <div className="text-xs text-muted">{recipe.category} • {recipe.items.length} ingredientes</div>
+                        </div>
+                        <span style={{ fontWeight: 700, color: 'var(--brand-600)', fontSize: '0.8125rem' }}>{formatCurrency(cost)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
     </div>
-  )
-}
-
-function ListChecks(props: { size: number; style?: React.CSSProperties }) {
-  return (
-    <svg width={props.size} height={props.size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={props.style}>
-      <path d="M10 6H21"/><path d="M10 12H21"/><path d="M10 18H21"/><polyline points="3 6 4 7 6 5"/><polyline points="3 12 4 13 6 11"/><polyline points="3 18 4 19 6 17"/>
-    </svg>
   )
 }
