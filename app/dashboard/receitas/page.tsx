@@ -56,6 +56,14 @@ export default function ReceitasPage() {
       supabase.from('recipes').select('*').order('display_order'),
       supabase.from('ingredients').select('*').order('name'),
     ])
+    if (recipesRes.error) {
+      console.error('Erro ao carregar receitas:', recipesRes.error)
+      showToast('error', `Erro receitas: ${recipesRes.error.message}`)
+    }
+    if (ingredientsRes.error) {
+      console.error('Erro ao carregar ingredientes:', ingredientsRes.error)
+      showToast('error', `Erro ingredientes: ${ingredientsRes.error.message}`)
+    }
     setRecipes((recipesRes.data || []).map(r => ({
       ...r,
       items: Array.isArray(r.items) ? r.items : [],
@@ -125,11 +133,14 @@ export default function ReceitasPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir esta receita? Essa ação não pode ser desfeita.')) return
     try {
-      await supabase.from('recipes').delete().eq('id', id)
+      const { error } = await supabase.from('recipes').delete().eq('id', id)
+      if (error) throw error
       showToast('success', 'Receita excluída!')
       load()
-    } catch {
-      showToast('error', 'Erro ao excluir')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Erro desconhecido'
+      console.error('Erro ao excluir receita:', err)
+      showToast('error', `Erro ao excluir: ${msg}`)
     }
   }
 

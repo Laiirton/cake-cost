@@ -27,7 +27,9 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  // Use getClaims() as recommended by Supabase docs for proxy/middleware
+  const { data } = await supabase.auth.getClaims()
+  const user = data?.claims
 
   if (
     !user &&

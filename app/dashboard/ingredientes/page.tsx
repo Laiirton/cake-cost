@@ -39,7 +39,11 @@ export default function IngredientesPage() {
   const supabase = createClient()
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('ingredients').select('*').order('display_order')
+    const { data, error } = await supabase.from('ingredients').select('*').order('display_order')
+    if (error) {
+      console.error('Erro ao carregar ingredientes:', error)
+      showToast('error', `Erro ao carregar: ${error.message}`)
+    }
     setItems(data || [])
     setLoading(false)
   }, [supabase])
@@ -85,18 +89,25 @@ export default function IngredientesPage() {
         showToast('success', 'Ingrediente criado!')
       }
       setShowModal(false); load()
-    } catch {
-      showToast('error', 'Erro ao salvar ingrediente')
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Erro desconhecido'
+      console.error('Erro ao salvar ingrediente:', err)
+      showToast('error', `Erro ao salvar: ${msg}`)
     } finally { setSaving(false) }
   }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir ingrediente? Receitas que usam este ingrediente podem ser afetadas.')) return
     try {
-      await supabase.from('ingredients').delete().eq('id', id)
+      const { error } = await supabase.from('ingredients').delete().eq('id', id)
+      if (error) throw error
       showToast('success', 'Ingrediente excluído!')
       load()
-    } catch { showToast('error', 'Erro ao excluir') }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Erro desconhecido'
+      console.error('Erro ao excluir:', err)
+      showToast('error', `Erro ao excluir: ${msg}`)
+    }
   }
 
   const filtered = items
