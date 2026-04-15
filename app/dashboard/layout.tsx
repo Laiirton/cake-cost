@@ -1,25 +1,19 @@
-'use client'
+import { createClient } from '@/lib/supabase/server'
+import DashboardShell from './components/DashboardShell'
 
-import { useState } from 'react'
-import Sidebar from './components/Sidebar'
-import Header from './components/Header'
-
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
   return (
-    <>
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-      <div className="main-content">
-        <Header
-          onMenuClick={() => setSidebarOpen(true)}
-        />
-        {children}
-      </div>
-    </>
+    <DashboardShell userEmail={user?.email}>
+      {children}
+    </DashboardShell>
   )
 }

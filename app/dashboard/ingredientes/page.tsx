@@ -37,6 +37,8 @@ export default function IngredientesPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'year'>('name')
+  const [yearFilter, setYearFilter] = useState<'all' | 'current' | 'old'>('all')
+  const [formError, setFormError] = useState('')
   const supabase = useMemo(() => createClient(), [])
 
   const load = useCallback(async () => {
@@ -58,12 +60,14 @@ export default function IngredientesPage() {
 
   const openNew = () => {
     setEditing(null)
+    setFormError('')
     setForm({ ...emptyIngredient, display_order: items.length })
     setShowModal(true)
   }
 
   const openEdit = (item: Ingredient) => {
     setEditing(item)
+    setFormError('')
     setForm({
       name: item.name,
       purchase_quantity: item.purchase_quantity,
@@ -77,7 +81,10 @@ export default function IngredientesPage() {
   }
 
   const handleSave = async () => {
-    if (!form.name.trim()) return
+    if (!form.name.trim()) {
+      setFormError('Informe o nome do ingrediente.')
+      return
+    }
     setSaving(true)
     try {
       if (editing) {
@@ -113,6 +120,7 @@ export default function IngredientesPage() {
 
   const filtered = items
     .filter(i => i.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(i => yearFilter === 'all' || (yearFilter === 'current' ? i.updated_year >= new Date().getFullYear() : i.updated_year < new Date().getFullYear()))
     .sort((a, b) => {
       if (sortBy === 'price') return b.purchase_price - a.purchase_price
       if (sortBy === 'year') return b.updated_year - a.updated_year
@@ -138,6 +146,17 @@ export default function IngredientesPage() {
         <div className="search-bar" style={{ flex: 1, maxWidth: 360 }}>
           <Search size={18} />
           <input placeholder="Buscar ingrediente..." value={search} onChange={e => setSearch(e.target.value)} />
+        </div>
+        <div style={{ display: 'flex', gap: 6 }}>
+          {([
+            { value: 'all', label: 'Todos' },
+            { value: 'current', label: 'Atualizados' },
+            { value: 'old', label: 'Antigos' },
+          ] as const).map(option => (
+            <button key={option.value} className={`btn btn-sm ${yearFilter === option.value ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setYearFilter(option.value)}>
+              {option.label}
+            </button>
+          ))}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {(['name', 'price', 'year'] as const).map(s => (
@@ -232,6 +251,7 @@ export default function IngredientesPage() {
               <button className="btn btn-ghost btn-icon" onClick={() => setShowModal(false)}><X size={20} /></button>
             </div>
             <div className="modal-body">
+              {formError && <div className="form-error" style={{ marginBottom: 16 }}>{formError}</div>}
               <div className="form-group">
                 <label className="form-label">Nome *</label>
                 <input className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Ex: Farinha de Trigo" autoFocus />

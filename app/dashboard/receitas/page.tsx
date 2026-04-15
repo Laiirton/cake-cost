@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import {
   Plus, Search, Pencil, Trash2, X, BookOpen, ChevronDown, ChevronRight,
@@ -264,9 +265,9 @@ export default function ReceitasPage() {
             return (
               <div key={recipe.id} className="card" style={{ cursor: 'pointer' }} onClick={() => openEdit(recipe)}>
                 <div className="card-body" style={{ padding: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                    <div>
-                      <h3 style={{ fontSize: '1.05rem', marginBottom: 4 }}>{recipe.name}</h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                      <div>
+                        <h3 style={{ fontSize: '1.05rem', marginBottom: 4 }}>{recipe.name}</h3>
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                         {recipe.category && <span className="badge badge-brand">{recipe.category}</span>}
                         {recipe.size_label && <span className="badge badge-neutral">{recipe.size_label}</span>}
@@ -287,12 +288,18 @@ export default function ReceitasPage() {
                   </div>
 
                   {/* Cost */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
-                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Custo Total dos Ingredientes</span>
-                    <span style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-600)' }}>
-                      {formatCurrency(totalCost)}
-                    </span>
-                  </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--gray-50)', borderRadius: 'var(--radius-md)' }}>
+                      <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Custo Total dos Ingredientes</span>
+                      <span style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--brand-600)' }}>
+                        {formatCurrency(totalCost)}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="text-xs text-muted">Use esta receita para montar o modelo de venda</span>
+                      <Link href={`/dashboard/calculadora?recipe=${recipe.id}`} className="btn btn-secondary btn-sm" onClick={(event) => event.stopPropagation()}>
+                        Calcular preco
+                      </Link>
+                    </div>
                 </div>
               </div>
             )

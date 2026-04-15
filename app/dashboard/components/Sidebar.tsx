@@ -18,32 +18,37 @@ import {
 
 const navItems = [
   {
-    section: 'Menu',
+    section: 'Visao Geral',
     items: [
       { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
     ],
   },
   {
-    section: 'Cadastros',
+    section: 'Base',
     items: [
       { href: '/dashboard/ingredientes', label: 'Ingredientes', icon: Wheat },
       { href: '/dashboard/receitas', label: 'Receitas', icon: BookOpen },
-      { href: '/dashboard/calculadora', label: 'Calculadora', icon: Calculator },
       { href: '/dashboard/clientes', label: 'Clientes', icon: Users },
     ],
   },
   {
-    section: 'Operacional',
+    section: 'Vendas',
     items: [
+      { href: '/dashboard/calculadora', label: 'Modelos e Precos', icon: Calculator },
       { href: '/dashboard/pedidos', label: 'Pedidos', icon: ShoppingBag },
-      { href: '/dashboard/producao', label: 'Produção', icon: ListChecks },
+    ],
+  },
+  {
+    section: 'Operacao',
+    items: [
+      { href: '/dashboard/producao', label: 'Producao', icon: ListChecks },
       { href: '/dashboard/financeiro', label: 'Financeiro', icon: DollarSign },
     ],
   },
   {
     section: 'Sistema',
     items: [
-      { href: '/dashboard/configuracoes', label: 'Configurações', icon: Settings },
+      { href: '/dashboard/configuracoes', label: 'Configuracoes', icon: Settings },
     ],
   },
 ]
@@ -66,17 +71,18 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {isOpen && <div className="mobile-overlay" onClick={onClose} />}
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">🧁</div>
+          <div className="sidebar-logo-icon">CC</div>
           <div className="sidebar-logo-text">
             <h2>Cake Cost</h2>
-            <span>Gestão de Confeitaria</span>
+            <span>Gestao de Confeitaria</span>
           </div>
-           <button
-             className="btn-ghost btn-icon mobile-close-btn"
-             onClick={onClose}
-             style={{ marginLeft: 'auto', color: 'white' }}
-             id="close-sidebar-btn"
-           >
+          <button
+            className="btn-ghost btn-icon mobile-close-btn"
+            onClick={onClose}
+            style={{ marginLeft: 'auto', color: 'white' }}
+            id="close-sidebar-btn"
+            aria-label="Fechar menu"
+          >
             <X size={20} />
           </button>
         </div>
