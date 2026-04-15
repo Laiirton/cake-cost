@@ -194,9 +194,9 @@ export default function FinanceiroPage() {
     return matchSearch && matchKind
   })
 
-  const totalIncome = scopedItems.filter((item) => item.kind === 'income').reduce((sum, item) => sum + item.amount, 0)
-  const totalExpense = scopedItems.filter((item) => item.kind === 'expense').reduce((sum, item) => sum + item.amount, 0)
-  const balance = totalIncome - totalExpense
+  const manualIncome = scopedItems.filter((item) => item.kind === 'income').reduce((sum, item) => sum + item.amount, 0)
+  const manualExpense = scopedItems.filter((item) => item.kind === 'expense').reduce((sum, item) => sum + item.amount, 0)
+  const manualBalance = manualIncome - manualExpense
   const orderSales = scopedOrders.filter((order) => order.status !== 'cancelled').reduce((sum, order) => sum + order.sale_price, 0)
   const orderDeposits = scopedOrders.filter((order) => order.status !== 'cancelled').reduce((sum, order) => sum + order.deposit_amount, 0)
   const receivables = scopedOrders
@@ -225,7 +225,7 @@ export default function FinanceiroPage() {
       <div className="page-header">
         <div>
           <h1>Financeiro</h1>
-          <p>Diferencie o que foi vendido nos pedidos do que entrou no caixa manual.</p>
+          <p>Pedidos e caixa manual ficam separados para nao misturar saldo a receber com movimentacao avulsa.</p>
         </div>
         <button className="btn btn-primary" onClick={openNew}>
           <Plus size={18} />
@@ -233,46 +233,96 @@ export default function FinanceiroPage() {
         </button>
       </div>
 
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
-        <div className="stat-card">
-          <div className="stat-icon"><TrendingUp size={24} /></div>
-          <div className="stat-value">{formatCurrency(orderSales)}</div>
-          <div className="stat-label">Vendido em pedidos</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon"><DollarSign size={24} /></div>
-          <div className="stat-value">{formatCurrency(orderDeposits)}</div>
-          <div className="stat-label">Entradas registradas nos pedidos</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon"><TrendingDown size={24} /></div>
-          <div className="stat-value">{formatCurrency(receivables)}</div>
-          <div className="stat-label">Ainda a receber</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon"><DollarSign size={24} /></div>
-          <div className="stat-value" style={{ color: balance >= 0 ? 'var(--success-600)' : 'var(--danger-500)' }}>
-            {formatCurrency(balance)}
-          </div>
-          <div className="stat-label">Saldo dos lancamentos</div>
-        </div>
-      </div>
-
       <div className="card" style={{ marginBottom: 24, background: 'linear-gradient(135deg, var(--gray-50), white)' }}>
-        <div className="card-body" style={{ display: 'flex', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap', alignItems: 'center' }}>
-          <div>
-            <div style={{ fontWeight: 800, marginBottom: 4 }}>Periodo em foco: {period === 'all' ? 'Todos os registros' : currentMonthLabel}</div>
-            <div className="text-sm text-muted">
-              Pedidos mostram visao comercial. Lancamentos mostram caixa manual e despesas avulsas.
+        <div className="card-body" style={{ display: 'grid', gap: 24 }}>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div>
+              <div style={{ fontWeight: 800, marginBottom: 4 }}>Como ler os totais</div>
+              <div className="text-sm text-muted">
+                Pedidos mostram o valor vendido e o que ainda falta cobrar. Caixa manual mostra receitas e despesas avulsas, sem alterar o a receber.
+              </div>
+              <div className="text-xs text-muted" style={{ marginTop: 6 }}>
+                Periodo em foco: {period === 'all' ? 'Todos os registros' : currentMonthLabel}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className={`btn btn-sm ${period === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPeriod('all')}>
+                Tudo
+              </button>
+              <button className={`btn btn-sm ${period === 'month' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPeriod('month')}>
+                Este mes
+              </button>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className={`btn btn-sm ${period === 'all' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPeriod('all')}>
-              Tudo
-            </button>
-            <button className={`btn btn-sm ${period === 'month' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setPeriod('month')}>
-              Este mes
-            </button>
+
+          <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 4 }}>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 4 }}>Pedidos</div>
+                <div className="text-sm text-muted">
+                  Visao comercial dos pedidos. Nao mistura os lancamentos manuais.
+                </div>
+              </div>
+              <span className="badge badge-info">{pendingOrders.length} em aberto</span>
+            </div>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+              <div className="stat-card">
+                <div className="stat-icon"><TrendingUp size={24} /></div>
+                <div className="stat-value">{formatCurrency(orderSales)}</div>
+                <div className="stat-label">Vendido em pedidos</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon"><DollarSign size={24} /></div>
+                <div className="stat-value">{formatCurrency(orderDeposits)}</div>
+                <div className="stat-label">Entradas recebidas nos pedidos</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon"><TrendingDown size={24} /></div>
+                <div className="stat-value">{formatCurrency(receivables)}</div>
+                <div className="stat-label">Ainda a receber</div>
+                <div className="text-xs text-muted" style={{ marginTop: 6 }}>
+                  Apenas pedidos pendentes ou parciais.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: 20 }}>
+            <div style={{ display: 'flex', gap: 12, justifyContent: 'space-between', flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontWeight: 800, marginBottom: 4 }}>Caixa manual</div>
+                <div className="text-sm text-muted">
+                  Receitas e despesas lancadas manualmente. Esse saldo nao altera o a receber dos pedidos.
+                </div>
+              </div>
+              <span className="badge badge-neutral">{filtered.length} lancamentos</span>
+            </div>
+            <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+              <div className="stat-card">
+                <div className="stat-icon"><TrendingUp size={24} /></div>
+                <div className="stat-value" style={{ color: 'var(--success-600)' }}>
+                  {formatCurrency(manualIncome)}
+                </div>
+                <div className="stat-label">Receitas manuais</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon"><TrendingDown size={24} /></div>
+                <div className="stat-value" style={{ color: 'var(--danger-500)' }}>
+                  {formatCurrency(manualExpense)}
+                </div>
+                <div className="stat-label">Despesas manuais</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-icon"><DollarSign size={24} /></div>
+                <div className="stat-value" style={{ color: manualBalance >= 0 ? 'var(--success-600)' : 'var(--danger-500)' }}>
+                  {formatCurrency(manualBalance)}
+                </div>
+                <div className="stat-label">Saldo do caixa manual</div>
+                <div className="text-xs text-muted" style={{ marginTop: 6 }}>
+                  {formatCurrency(manualIncome)} em receitas - {formatCurrency(manualExpense)} em despesas
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
