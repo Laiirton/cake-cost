@@ -7,10 +7,12 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  Download,
   Plus,
   Save,
   Search,
   ShoppingBag,
+  Printer,
   Trash2,
   X,
 } from 'lucide-react'
@@ -58,6 +60,751 @@ const emptyDefaults: SettingsDefaults = {
   packagingCost: 0,
   deliveryCost: 0,
   markupPct: 50,
+}
+
+interface SummaryRow {
+  label: string
+  value: string
+  amount?: number
+}
+
+interface SummarySection {
+  title: string
+  rows: SummaryRow[]
+}
+
+interface SummaryIngredientRow {
+  label: string
+  quantity: string
+  cost: string
+  amount: number
+}
+
+interface SummaryIngredientSection {
+  key: string
+  title: string
+  emoji: string
+  totalCost: string
+  totalAmount: number
+  rows: SummaryIngredientRow[]
+}
+
+interface SummarySnapshot {
+  title: string
+  subtitle: string
+  generatedAt: string
+  sections: SummarySection[]
+  ingredientSections: SummaryIngredientSection[]
+  notes: string
+  servingsValue: number
+  pricing: PricingBreakdown
+  raw: {
+    recipe: {
+      id: string
+      name: string
+      category: string
+      sizeLabel: string
+      yieldLabel: string
+    }
+    presetName: string | null
+    selectedRecipeId: string
+    selectedPresetId: string | null
+    servingsTarget: number
+    laborHours: number
+    laborRate: number
+    fixedCost: number
+    orderGoal: number
+    packagingCost: number
+    deliveryCost: number
+    markupPct: number
+    manualPrice: number | null
+    extraItems: ExtraItem[]
+    recipeItems: Array<{
+      section: string
+      sectionLabel: string
+      ingredientName: string
+      quantity: number
+      unit: string
+      cost: number
+    }>
+  }
+}
+
+const quantityFormatter = new Intl.NumberFormat('pt-BR', {
+  maximumFractionDigits: 3,
+})
+
+function formatQuantity(value: number): string {
+  if (!Number.isFinite(value)) return '-'
+  return quantityFormatter.format(value)
+}
+
+function sanitizeFileName(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
+function escapeCsvValue(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`
+}
+
+function downloadTextFile(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: `${mimeType};charset=utf-8` })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = filename
+  link.rel = 'noopener'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+async function copyTextToClipboard(value: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value)
+    return
+  }
+
+  const textarea = document.createElement('textarea')
+  textarea.value = value
+  textarea.readOnly = true
+  textarea.style.position = 'fixed'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+
+  const copied = document.execCommand('copy')
+  textarea.remove()
+
+  if (!copied) {
+    throw new Error('Nao foi possivel copiar o resumo.')
+  }
+}
+
+function buildSummaryText(snapshot: SummarySnapshot): string {
+  const lines: string[] = [
+    snapshot.title,
+    snapshot.subtitle,
+    `Gerado em: ${snapshot.generatedAt}`,
+    '',
+  ]
+
+  snapshot.sections.forEach((section) => {
+    lines.push(section.title)
+    section.rows.forEach((row) => {
+      lines.push(`- ${row.label}: ${row.value}`)
+    })
+    lines.push('')
+  })
+
+  snapshot.ingredientSections.forEach((section) => {
+    lines.push(`Ingredientes - ${section.title}`)
+    section.rows.forEach((row) => {
+      lines.push(`- ${row.label} | ${row.quantity} | ${row.cost}`)
+    })
+    lines.push(`Subtotal: ${section.totalCost}`)
+    lines.push('')
+  })
+
+  if (snapshot.notes) {
+    lines.push('Observacoes')
+    lines.push(snapshot.notes)
+  }
+
+  return lines.join('\n').trim()
+}
+
+function buildSummaryCsv(snapshot: SummarySnapshot): string {
+  const rows: string[] = ['Grupo;Seção;Campo;Quantidade;Valor']
+
+  snapshot.sections.forEach((section) => {
+    section.rows.forEach((row) => {
+      rows.push(
+        [
+          escapeCsvValue('Resumo'),
+          escapeCsvValue(section.title),
+          escapeCsvValue(row.label),
+          escapeCsvValue(''),
+          escapeCsvValue(row.value),
+        ].join(';')
+      )
+    })
+  })
+
+  snapshot.ingredientSections.forEach((section) => {
+    section.rows.forEach((row) => {
+      rows.push(
+        [
+          escapeCsvValue('Ingredientes'),
+          escapeCsvValue(section.title),
+          escapeCsvValue(row.label),
+          escapeCsvValue(row.quantity),
+          escapeCsvValue(row.cost),
+        ].join(';')
+      )
+    })
+
+    rows.push(
+      [
+        escapeCsvValue('Ingredientes'),
+        escapeCsvValue(section.title),
+        escapeCsvValue('Subtotal'),
+        escapeCsvValue(''),
+        escapeCsvValue(section.totalCost),
+      ].join(';')
+    )
+  })
+
+  if (snapshot.notes) {
+    rows.push(
+      [
+        escapeCsvValue('Observacoes'),
+        escapeCsvValue('Modelo'),
+        escapeCsvValue('Notas'),
+        escapeCsvValue(''),
+        escapeCsvValue(snapshot.notes),
+      ].join(';')
+    )
+  }
+
+  return rows.join('\n')
+}
+
+function buildSummaryPrintDocument(snapshot: SummarySnapshot): string {
+  const renderRows = (rows: SummaryRow[]) =>
+    rows
+      .map(
+        (row) => `
+          <tr>
+            <td>${escapeHtml(row.label)}</td>
+            <td>${escapeHtml(row.value)}</td>
+          </tr>
+        `
+      )
+      .join('')
+
+  const renderIngredientRows = (rows: SummaryIngredientRow[]) =>
+    rows
+      .map(
+        (row) => `
+          <tr>
+            <td>${escapeHtml(row.label)}</td>
+            <td>${escapeHtml(row.quantity)}</td>
+            <td>${escapeHtml(row.cost)}</td>
+          </tr>
+        `
+      )
+      .join('')
+
+  const sectionCards = snapshot.sections
+    .map(
+      (section) => `
+        <section class="sheet-card">
+          <div class="sheet-card-header">
+            <h2>${escapeHtml(section.title)}</h2>
+            <span>${section.rows.length} itens</span>
+          </div>
+          <table class="sheet-table">
+            <tbody>${renderRows(section.rows)}</tbody>
+          </table>
+        </section>
+      `
+    )
+    .join('')
+
+  const ingredientCards = snapshot.ingredientSections
+    .map(
+      (section) => `
+        <section class="sheet-card sheet-card-ingredient">
+          <div class="sheet-card-header">
+            <h2>${escapeHtml(section.emoji)} ${escapeHtml(section.title)}</h2>
+            <span>${escapeHtml(section.totalCost)}</span>
+          </div>
+          <table class="sheet-table sheet-table-ingredient">
+            <thead>
+              <tr>
+                <th>Ingrediente</th>
+                <th>Qtd.</th>
+                <th>Custo</th>
+              </tr>
+            </thead>
+            <tbody>${renderIngredientRows(section.rows)}</tbody>
+          </table>
+        </section>
+      `
+    )
+    .join('')
+
+  const notesCard = snapshot.notes
+    ? `
+        <section class="sheet-card sheet-card-notes">
+          <div class="sheet-card-header">
+            <h2>Observacoes</h2>
+          </div>
+          <p class="sheet-notes">${escapeHtml(snapshot.notes)}</p>
+        </section>
+      `
+    : ''
+
+  return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeHtml(snapshot.title)} - resumo</title>
+    <style>
+      @page {
+        size: A4 landscape;
+        margin: 10mm;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+        color: #0f172a;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      body {
+        padding: 0;
+      }
+
+      .sheet {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .sheet-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        align-items: flex-start;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #e2e8f0;
+      }
+
+      .sheet-title {
+        margin: 0;
+        font-size: 22px;
+        line-height: 1.1;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+      }
+
+      .sheet-subtitle {
+        margin-top: 4px;
+        font-size: 11px;
+        color: #475569;
+      }
+
+      .sheet-meta {
+        text-align: right;
+        font-size: 10px;
+        color: #64748b;
+      }
+
+      .sheet-hero {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .sheet-hero-item {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 10px 12px;
+        background: linear-gradient(135deg, #fdf2f8 0%, #fffbeb 100%);
+        min-height: 64px;
+      }
+
+      .sheet-hero-label {
+        font-size: 9px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #64748b;
+      }
+
+      .sheet-hero-value {
+        margin-top: 4px;
+        font-size: 18px;
+        line-height: 1.05;
+        font-weight: 800;
+        color: #111827;
+      }
+
+      .sheet-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .sheet-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 10px 12px;
+        background: #fff;
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+
+      .sheet-card-notes {
+        grid-column: 1 / -1;
+      }
+
+      .sheet-card-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 8px;
+      }
+
+      .sheet-card-header h2 {
+        margin: 0;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #be185d;
+      }
+
+      .sheet-card-header span {
+        font-size: 10px;
+        font-weight: 700;
+        color: #64748b;
+      }
+
+      .sheet-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 10px;
+      }
+
+      .sheet-table td,
+      .sheet-table th {
+        padding: 3px 0;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: top;
+      }
+
+      .sheet-table th {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #64748b;
+        text-align: left;
+      }
+
+      .sheet-table td:nth-child(2),
+      .sheet-table td:nth-child(3),
+      .sheet-table th:nth-child(2),
+      .sheet-table th:nth-child(3) {
+        text-align: right;
+      }
+
+      .sheet-table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .sheet-table td:first-child {
+        color: #334155;
+      }
+
+      .sheet-table td:last-child {
+        font-weight: 700;
+      }
+
+      .sheet-table-ingredient td:nth-child(2),
+      .sheet-table-ingredient th:nth-child(2) {
+        width: 74px;
+      }
+
+      .sheet-table-ingredient td:nth-child(3),
+      .sheet-table-ingredient th:nth-child(3) {
+        width: 88px;
+      }
+
+      .sheet-notes {
+        margin: 0;
+        font-size: 10px;
+        line-height: 1.35;
+        white-space: pre-wrap;
+        color: #334155;
+      }
+
+      .sheet-footer {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        padding-top: 4px;
+        font-size: 9px;
+        color: #64748b;
+      }
+
+      .sheet-footer strong {
+        color: #0f172a;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="sheet">
+      <header class="sheet-header">
+        <div>
+          <h1 class="sheet-title">${escapeHtml(snapshot.title)}</h1>
+          <div class="sheet-subtitle">${escapeHtml(snapshot.subtitle)}</div>
+        </div>
+        <div class="sheet-meta">
+          <div><strong>Gerado em</strong></div>
+          <div>${escapeHtml(snapshot.generatedAt)}</div>
+        </div>
+      </header>
+
+      <section class="sheet-hero">
+        <div class="sheet-hero-item">
+          <div class="sheet-hero-label">Venda final</div>
+          <div class="sheet-hero-value">${escapeHtml(formatCurrency(snapshot.pricing.salePrice))}</div>
+        </div>
+        <div class="sheet-hero-item">
+          <div class="sheet-hero-label">Lucro</div>
+          <div class="sheet-hero-value">${escapeHtml(formatCurrency(snapshot.pricing.profit))}</div>
+        </div>
+        <div class="sheet-hero-item">
+          <div class="sheet-hero-label">Margem</div>
+          <div class="sheet-hero-value">${escapeHtml(snapshot.pricing.profitMargin.toFixed(1))}%</div>
+        </div>
+        <div class="sheet-hero-item">
+          <div class="sheet-hero-label">Custo total</div>
+          <div class="sheet-hero-value">${escapeHtml(formatCurrency(snapshot.pricing.totalCost))}</div>
+        </div>
+      </section>
+
+      <section class="sheet-grid">
+        ${sectionCards}
+        ${ingredientCards}
+        ${notesCard}
+      </section>
+
+      <footer class="sheet-footer">
+        <div><strong>${escapeHtml(snapshot.raw.recipe.name)}</strong></div>
+        <div>${snapshot.servingsValue > 0 ? `${snapshot.servingsValue} porções planejadas` : 'Sem porções planejadas'}</div>
+      </footer>
+    </main>
+  </body>
+</html>
+`
+}
+
+function buildSummarySnapshot(params: {
+  selectedRecipe: RecipeSummary
+  selectedPreset: CalculatorPreset | null
+  pricing: PricingBreakdown
+  servingsTarget: number
+  laborHours: number
+  laborRate: number
+  fixedCost: number
+  orderGoal: number
+  packagingCost: number
+  deliveryCost: number
+  markupPct: number
+  manualPrice: number | null
+  extraItems: ExtraItem[]
+  modelNotes: string
+  ingredientsMap: Map<string, Ingredient>
+}): SummarySnapshot {
+  const servingsValue =
+    params.servingsTarget > 0
+      ? params.servingsTarget
+      : parseYieldToServings(params.selectedRecipe.yield_label || '')
+  const modelName = params.selectedPreset?.name || `Simulacao de ${params.selectedRecipe.name}`
+  const subtitleParts = [params.selectedRecipe.name]
+  if (params.selectedRecipe.category) subtitleParts.push(params.selectedRecipe.category)
+  if (params.selectedRecipe.size_label) subtitleParts.push(params.selectedRecipe.size_label)
+
+  const ingredientSections = RECIPE_SECTIONS.map((section) => {
+    const rows = params.selectedRecipe.items
+      .filter((item) => item.section === section.key)
+      .map((item) => {
+        const ingredient = params.ingredientsMap.get(item.ingredient_id)
+        const cost = calculateItemCost(item, ingredient)
+        return {
+          label: ingredient?.name || 'Ingrediente removido',
+          quantity: `${formatQuantity(item.quantity)} ${item.unit}`,
+          cost: formatCurrency(cost),
+          amount: cost,
+        }
+      })
+
+    return {
+      key: section.key,
+      title: section.label,
+      emoji: section.emoji,
+      totalCost: formatCurrency(params.pricing.sectionCosts[section.key] || 0),
+      totalAmount: params.pricing.sectionCosts[section.key] || 0,
+      rows,
+    }
+  }).filter((section) => section.rows.length > 0 || section.totalAmount > 0)
+
+  const extraRows = params.extraItems
+    .filter((item) => item.name.trim() || item.cost > 0)
+    .map((item) => ({
+      label: item.name.trim() || 'Extra sem nome',
+      value: formatCurrency(item.cost),
+      amount: item.cost,
+    }))
+
+  const recipeInfoRows: SummaryRow[] = [
+    { label: 'Modelo', value: modelName },
+    { label: 'Receita', value: params.selectedRecipe.name },
+    { label: 'Categoria', value: params.selectedRecipe.category || '-' },
+    { label: 'Tamanho', value: params.selectedRecipe.size_label || '-' },
+    { label: 'Rendimento', value: params.selectedRecipe.yield_label || '-' },
+    {
+      label: 'Porções planejadas',
+      value: servingsValue > 0 ? `${servingsValue} porções` : '-',
+      amount: servingsValue || undefined,
+    },
+  ]
+
+  const operationalRows: SummaryRow[] = [
+    { label: 'Horas de trabalho', value: `${params.laborHours.toFixed(1)} h`, amount: params.laborHours },
+    { label: 'Valor/hora', value: formatCurrency(params.laborRate), amount: params.laborRate },
+    { label: 'Mão de obra', value: formatCurrency(params.pricing.laborCost), amount: params.pricing.laborCost },
+    { label: 'Custo fixo considerado', value: formatCurrency(params.fixedCost), amount: params.fixedCost },
+    { label: 'Meta de pedidos/mês', value: `${params.orderGoal}`, amount: params.orderGoal },
+    {
+      label: 'Custo fixo/pedido',
+      value: formatCurrency(params.pricing.fixedCostPerOrder),
+      amount: params.pricing.fixedCostPerOrder,
+    },
+    { label: 'Embalagem', value: formatCurrency(params.pricing.packagingCost), amount: params.pricing.packagingCost },
+    { label: 'Entrega', value: formatCurrency(params.pricing.deliveryCost), amount: params.pricing.deliveryCost },
+  ]
+
+  const financialRows: SummaryRow[] = [
+    { label: 'Custo dos ingredientes', value: formatCurrency(params.pricing.ingredientCost), amount: params.pricing.ingredientCost },
+    { label: 'Total extras', value: formatCurrency(params.pricing.extraItemsCost), amount: params.pricing.extraItemsCost },
+    { label: 'Custo total', value: formatCurrency(params.pricing.totalCost), amount: params.pricing.totalCost },
+    { label: 'Markup', value: `+${params.markupPct}%`, amount: params.markupPct },
+    { label: 'Preço sugerido', value: formatCurrency(params.pricing.suggestedPrice), amount: params.pricing.suggestedPrice },
+    { label: 'Preço final', value: formatCurrency(params.pricing.salePrice), amount: params.pricing.salePrice },
+    { label: 'Lucro', value: formatCurrency(params.pricing.profit), amount: params.pricing.profit },
+    { label: 'Margem', value: `${params.pricing.profitMargin.toFixed(1)}%`, amount: params.pricing.profitMargin },
+  ]
+
+  const servingRows: SummaryRow[] =
+    servingsValue > 0
+      ? [
+          {
+            label: 'Custo por porção',
+            value: formatCurrency(params.pricing.totalCost / servingsValue),
+            amount: params.pricing.totalCost / servingsValue,
+          },
+          {
+            label: 'Venda por porção',
+            value: formatCurrency(params.pricing.salePrice / servingsValue),
+            amount: params.pricing.salePrice / servingsValue,
+          },
+        ]
+      : []
+
+  const summarySections: SummarySection[] = [
+    { title: 'Dados do modelo', rows: recipeInfoRows },
+    {
+      title: 'Extras',
+      rows:
+        extraRows.length > 0
+          ? [
+              { label: 'Total de extras', value: formatCurrency(params.pricing.extraItemsCost), amount: params.pricing.extraItemsCost },
+              ...extraRows,
+            ]
+          : [{ label: 'Extras', value: 'Nenhum extra adicionado' }],
+    },
+    { title: 'Custos operacionais', rows: operationalRows },
+    { title: 'Resultado financeiro', rows: financialRows },
+    ...(servingRows.length > 0 ? [{ title: 'Por porção', rows: servingRows }] : []),
+  ]
+
+  const recipeItems = params.selectedRecipe.items.map((item) => {
+    const ingredient = params.ingredientsMap.get(item.ingredient_id)
+    const section = RECIPE_SECTIONS.find((recipeSection) => recipeSection.key === item.section)
+    const cost = calculateItemCost(item, ingredient)
+
+    return {
+      section: item.section,
+      sectionLabel: section ? `${section.emoji} ${section.label}` : item.section,
+      ingredientName: ingredient?.name || 'Ingrediente removido',
+      quantity: item.quantity,
+      unit: item.unit,
+      cost,
+    }
+  })
+
+  return {
+    title: modelName,
+    subtitle: subtitleParts.join(' • '),
+    generatedAt: new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date()),
+    sections: summarySections,
+    ingredientSections,
+    notes: params.modelNotes.trim(),
+    servingsValue,
+    pricing: params.pricing,
+    raw: {
+      recipe: {
+        id: params.selectedRecipe.id,
+        name: params.selectedRecipe.name,
+        category: params.selectedRecipe.category,
+        sizeLabel: params.selectedRecipe.size_label,
+        yieldLabel: params.selectedRecipe.yield_label,
+      },
+      presetName: params.selectedPreset?.name || null,
+      selectedRecipeId: params.selectedRecipe.id,
+      selectedPresetId: params.selectedPreset?.id || null,
+      servingsTarget: params.servingsTarget,
+      laborHours: params.laborHours,
+      laborRate: params.laborRate,
+      fixedCost: params.fixedCost,
+      orderGoal: params.orderGoal,
+      packagingCost: params.packagingCost,
+      deliveryCost: params.deliveryCost,
+      markupPct: params.markupPct,
+      manualPrice: params.manualPrice,
+      extraItems: params.extraItems,
+      recipeItems,
+    },
+  }
 }
 
 export default function CalculadoraPage() {
@@ -146,6 +893,44 @@ export default function CalculadoraPage() {
     deliveryCost,
     markupPct,
     manualPrice,
+  ])
+
+  const summarySnapshot = useMemo(() => {
+    if (!selectedRecipe || !pricing) return null
+
+    return buildSummarySnapshot({
+      selectedRecipe,
+      selectedPreset,
+      pricing,
+      servingsTarget,
+      laborHours,
+      laborRate,
+      fixedCost,
+      orderGoal,
+      packagingCost,
+      deliveryCost,
+      markupPct,
+      manualPrice,
+      extraItems,
+      modelNotes,
+      ingredientsMap,
+    })
+  }, [
+    selectedRecipe,
+    selectedPreset,
+    pricing,
+    servingsTarget,
+    laborHours,
+    laborRate,
+    fixedCost,
+    orderGoal,
+    packagingCost,
+    deliveryCost,
+    markupPct,
+    manualPrice,
+    extraItems,
+    modelNotes,
+    ingredientsMap,
   ])
 
   const presetSummaries = useMemo(() => {
@@ -480,7 +1265,53 @@ export default function CalculadoraPage() {
   }
 
   const handlePrint = () => {
-    window.print()
+    if (!summarySnapshot) return
+
+    const printWindow = window.open('', '_blank', 'width=1200,height=900')
+    if (!printWindow) {
+      showToast('error', 'Permita a abertura da janela de impressão.')
+      return
+    }
+
+    printWindow.document.open()
+    printWindow.document.write(buildSummaryPrintDocument(summarySnapshot))
+    printWindow.document.close()
+    printWindow.focus()
+
+    printWindow.onafterprint = () => {
+      printWindow.close()
+    }
+
+    setTimeout(() => {
+      printWindow.print()
+    }, 200)
+  }
+
+  const handleCopySummary = async () => {
+    if (!summarySnapshot) return
+
+    try {
+      await copyTextToClipboard(buildSummaryText(summarySnapshot))
+      showToast('success', 'Resumo copiado!')
+    } catch (error) {
+      showToast('error', getErrorMessage(error, 'Erro ao copiar o resumo'))
+    }
+  }
+
+  const handleDownloadCsv = () => {
+    if (!summarySnapshot) return
+
+    const baseName = sanitizeFileName(summarySnapshot.title) || 'resumo-modelo'
+    downloadTextFile(`${baseName}.csv`, buildSummaryCsv(summarySnapshot), 'text/csv')
+    showToast('success', 'CSV gerado!')
+  }
+
+  const handleDownloadJson = () => {
+    if (!summarySnapshot) return
+
+    const baseName = sanitizeFileName(summarySnapshot.title) || 'resumo-modelo'
+    downloadTextFile(`${baseName}.json`, `${JSON.stringify(summarySnapshot, null, 2)}\n`, 'application/json')
+    showToast('success', 'JSON gerado!')
   }
 
   if (loading) {
@@ -515,9 +1346,28 @@ export default function CalculadoraPage() {
           <p>Salve modelos prontos para vender sem recalcular tudo a cada pedido.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {selectedRecipe && (
+          {summarySnapshot && (
             <button className="btn btn-secondary" onClick={handlePrint}>
+              <Printer size={16} />
               Imprimir resumo
+            </button>
+          )}
+          {summarySnapshot && (
+            <button className="btn btn-secondary" onClick={handleCopySummary}>
+              <Copy size={16} />
+              Copiar resumo
+            </button>
+          )}
+          {summarySnapshot && (
+            <button className="btn btn-secondary" onClick={handleDownloadCsv}>
+              <Download size={16} />
+              Baixar CSV
+            </button>
+          )}
+          {summarySnapshot && (
+            <button className="btn btn-secondary" onClick={handleDownloadJson}>
+              <Download size={16} />
+              Baixar JSON
             </button>
           )}
           <button className="btn btn-primary" onClick={openCreatePreset} disabled={!selectedRecipe}>
@@ -981,7 +1831,6 @@ export default function CalculadoraPage() {
   <CurrencyInput
     nullable
     value={manualPrice}
-...
                             onChange={setManualPrice}
                             placeholder={formatCurrencyInputDraft(pricing.suggestedPrice)}
                             style={{ fontSize: '1.125rem', fontWeight: 700, textAlign: 'center' }}
