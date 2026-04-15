@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Settings, Save } from 'lucide-react'
+import { formatPhoneInput } from '@/lib/utils'
+import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
 
 interface BakerySettings {
   id: string
@@ -39,7 +41,7 @@ export default function ConfiguracoesPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('bakery_settings').select('*').limit(1).single()
@@ -105,10 +107,10 @@ export default function ConfiguracoesPage() {
               <label className="form-label">Nome do Proprietário</label>
               <input className="form-input" value={form.owner_name} onChange={e => setForm({ ...form, owner_name: e.target.value })} />
             </div>
-            <div className="form-group">
-              <label className="form-label">WhatsApp</label>
-              <input className="form-input" value={form.whatsapp} onChange={e => setForm({ ...form, whatsapp: e.target.value })} placeholder="(00) 00000-0000" />
-            </div>
+               <div className="form-group">
+                 <label className="form-label">WhatsApp</label>
+                 <input className="form-input" value={form.whatsapp} onChange={e => setForm({ ...form, whatsapp: formatPhoneInput(e.target.value) })} placeholder="(00) 00000-0000" />
+               </div>
             <div className="form-group">
               <label className="form-label">Observações</label>
               <textarea className="form-textarea" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
@@ -121,40 +123,52 @@ export default function ConfiguracoesPage() {
             <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>💰 Valores Padrão</h3>
           </div>
           <div className="card-body">
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Markup Padrão (%)</label>
-                <input className="form-input" type="number" step="0.1" value={form.default_markup_pct} onChange={e => setForm({ ...form, default_markup_pct: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Valor/Hora (R$)</label>
-                <input className="form-input" type="number" step="0.01" value={form.labor_hour_rate} onChange={e => setForm({ ...form, labor_hour_rate: parseFloat(e.target.value) || 0 })} />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Custo Fixo Mensal (R$)</label>
-                <input className="form-input" type="number" step="0.01" value={form.monthly_fixed_cost} onChange={e => setForm({ ...form, monthly_fixed_cost: parseFloat(e.target.value) || 0 })} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Meta de Pedidos/Mês</label>
-                <input className="form-input" type="number" value={form.monthly_order_goal} onChange={e => setForm({ ...form, monthly_order_goal: parseInt(e.target.value) || 0 })} />
-              </div>
-            </div>
-            <div className="form-row">
-              <div className="form-group">
-                <label className="form-label">Dias Trabalhados/Mês</label>
-                <input className="form-input" type="number" value={form.working_days_per_month} onChange={e => setForm({ ...form, working_days_per_month: parseInt(e.target.value) || 0 })} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Embalagem Padrão (R$)</label>
-                <input className="form-input" type="number" step="0.01" value={form.packaging_cost_default} onChange={e => setForm({ ...form, packaging_cost_default: parseFloat(e.target.value) || 0 })} />
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Entrega Padrão (R$)</label>
-              <input className="form-input" type="number" step="0.01" value={form.delivery_cost_default} onChange={e => setForm({ ...form, delivery_cost_default: parseFloat(e.target.value) || 0 })} />
-            </div>
+               <div className="form-row">
+                 <div className="form-group">
+                   <label className="form-label">Markup Padrão (%)</label>
+                   <input className="form-input" type="number" step="0.1" value={form.default_markup_pct} onChange={e => setForm({ ...form, default_markup_pct: parseFloat(e.target.value) || 0 })} />
+                 </div>
+                 <div className="form-group">
+                   <label className="form-label">Valor/Hora (R$)</label>
+                   <CurrencyInput 
+                     value={form.labor_hour_rate} 
+                     onChange={val => setForm({ ...form, labor_hour_rate: val })} 
+                   />
+                 </div>
+               </div>
+               <div className="form-row">
+                 <div className="form-group">
+                   <label className="form-label">Custo Fixo Mensal (R$)</label>
+                   <CurrencyInput 
+                     value={form.monthly_fixed_cost} 
+                     onChange={val => setForm({ ...form, monthly_fixed_cost: val })} 
+                   />
+                 </div>
+                 <div className="form-group">
+                   <label className="form-label">Meta de Pedidos/Mês</label>
+                   <input className="form-input" type="number" min="1" value={form.monthly_order_goal} onChange={e => setForm({ ...form, monthly_order_goal: parseInt(e.target.value) || 0 })} />
+                 </div>
+               </div>
+               <div className="form-row">
+                 <div className="form-group">
+                   <label className="form-label">Dias Trabalhados/Mês</label>
+                   <input className="form-input" type="number" value={form.working_days_per_month} onChange={e => setForm({ ...form, working_days_per_month: parseInt(e.target.value) || 0 })} />
+                 </div>
+                 <div className="form-group">
+                   <label className="form-label">Embalagem Padrão (R$)</label>
+                   <CurrencyInput 
+                     value={form.packaging_cost_default} 
+                     onChange={val => setForm({ ...form, packaging_cost_default: val })} 
+                   />
+                 </div>
+               </div>
+               <div className="form-group">
+                 <label className="form-label">Entrega Padrão (R$)</label>
+                 <CurrencyInput 
+                   value={form.delivery_cost_default} 
+                   onChange={val => setForm({ ...form, delivery_cost_default: val })} 
+                 />
+               </div>
           </div>
         </div>
       </div>

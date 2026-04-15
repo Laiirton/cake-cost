@@ -54,7 +54,7 @@ export default function CalculadoraPage() {
   const [presetName, setPresetName] = useState('')
   const [showSaveModal, setShowSaveModal] = useState(false)
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const ingredientsMap = useMemo(() => {
     const m = new Map<string, Ingredient>()

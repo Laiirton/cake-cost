@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil, Trash2, X, ShoppingBag } from 'lucide-react'
+import { formatCurrency, formatDate, parseCurrencyInput, formatCurrencyInput } from '@/lib/utils'
+import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
 
 interface Order {
   id: string; customer_id: string; preset_id: string; title: string; theme: string; event_date: string; delivery_date: string; size_label: string; servings: number; sale_price: number; deposit_amount: number; status: string; payment_status: string; labor_hours: number | null; labor_hour_rate: number | null; fixed_cost: number | null; markup_pct: number | null; custom_adjustments: unknown[]; notes: string; display_order: number
@@ -38,7 +40,7 @@ export default function PedidosPage() {
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const load = useCallback(async () => {
     const [ordersRes, customersRes, presetsRes] = await Promise.all([
@@ -69,6 +71,19 @@ export default function PedidosPage() {
 
   const handleSave = async () => {
     if (!(form.title as string)?.trim()) return
+    
+    // Validação: data de entrega deve ser antes ou igual à data do evento
+    const eventDate = form.event_date as string
+    const deliveryDate = form.delivery_date as string
+    if (eventDate && deliveryDate) {
+      const event = new Date(eventDate)
+      const delivery = new Date(deliveryDate)
+      if (delivery > event) {
+        showToast('error', 'A data de entrega não pode ser posterior à data do evento')
+        return
+      }
+    }
+    
     setSaving(true)
     try {
       if (editing) {
@@ -86,12 +101,17 @@ export default function PedidosPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este pedido?')) return
-    await supabase.from('orders').delete().eq('id', id); showToast('success', 'Excluído!'); load()
+    try {
+      const { error } = await supabase.from('orders').delete().eq('id', id)
+      if (error) throw error
+      showToast('success', 'Excluído!')
+      load()
+    } catch {
+      showToast('error', 'Erro ao excluir')
+    }
   }
 
   const filtered = items.filter(i => i.title.toLowerCase().includes(search.toLowerCase()))
-  const formatCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
-  const formatDate = (d: string) => { try { return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') } catch { return d } }
   const getStatusBadge = (s: string) => ({ pending: 'badge-warning', confirmed: 'badge-info', in_progress: 'badge-brand', completed: 'badge-success', delivered: 'badge-success', cancelled: 'badge-danger', partial: 'badge-warning', paid: 'badge-success' }[s] || 'badge-neutral')
   const getStatusLabel = (s: string) => statusOptions.find(o => o.value === s)?.label || paymentOptions.find(o => o.value === s)?.label || s
 
@@ -141,10 +161,22 @@ export default function PedidosPage() {
                 <div className="form-group"><label className="form-label">Tamanho</label><input className="form-input" value={(form.size_label as string) || ''} onChange={e => setForm({ ...form, size_label: e.target.value })} /></div>
                 <div className="form-group"><label className="form-label">Porções</label><input className="form-input" type="number" value={(form.servings as number) || 0} onChange={e => setForm({ ...form, servings: parseInt(e.target.value) || 0 })} /></div>
               </div>
-              <div className="form-row">
-                <div className="form-group"><label className="form-label">Preço de Venda (R$)</label><input className="form-input" type="number" step="0.01" value={(form.sale_price as number) || 0} onChange={e => setForm({ ...form, sale_price: parseFloat(e.target.value) || 0 })} /></div>
-                <div className="form-group"><label className="form-label">Sinal (R$)</label><input className="form-input" type="number" step="0.01" value={(form.deposit_amount as number) || 0} onChange={e => setForm({ ...form, deposit_amount: parseFloat(e.target.value) || 0 })} /></div>
-              </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Preço de Venda (R$)</label>
+                    <CurrencyInput 
+                      value={(form.sale_price as number) || 0} 
+                      onChange={val => setForm({ ...form, sale_price: val })} 
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Sinal (R$)</label>
+                    <CurrencyInput 
+                      value={(form.deposit_amount as number) || 0} 
+                      onChange={val => setForm({ ...form, deposit_amount: val })} 
+                    />
+                  </div>
+                </div>
               <div className="form-row">
                 <div className="form-group"><label className="form-label">Status</label><select className="form-select" value={(form.status as string) || 'pending'} onChange={e => setForm({ ...form, status: e.target.value })}>{statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
                 <div className="form-group"><label className="form-label">Pagamento</label><select className="form-select" value={(form.payment_status as string) || 'pending'} onChange={e => setForm({ ...form, payment_status: e.target.value })}>{paymentOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>

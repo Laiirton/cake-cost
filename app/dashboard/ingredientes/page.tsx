@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil, Trash2, X, Wheat, ArrowUpDown } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
 
 interface Ingredient {
   id: string
@@ -36,7 +37,7 @@ export default function IngredientesPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'year'>('name')
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const load = useCallback(async () => {
     const { data, error } = await supabase.from('ingredients').select('*').order('display_order')
@@ -127,7 +128,7 @@ export default function IngredientesPage() {
       <div className="page-header">
         <div>
           <h1>Ingredientes</h1>
-          <p>{items.length} ingredientes cadastrados • Valor total em estoque: {formatCurrency(totalValue)}</p>
+          <p>{items.length} ingredientes cadastrados • Total de compra cadastrado: {formatCurrency(totalValue)}</p>
         </div>
         <button className="btn btn-primary" onClick={openNew}><Plus size={18} /> Novo Ingrediente</button>
       </div>
@@ -256,10 +257,13 @@ export default function IngredientesPage() {
                       <option value="dz">Dúzia (dz)</option>
                     </select>
                   </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Preço (R$)</label>
-                    <input className="form-input" type="number" step="0.01" min="0" value={form.purchase_price || ''} onChange={e => setForm({ ...form, purchase_price: parseFloat(e.target.value) || 0 })} placeholder="0,00" />
-                  </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Preço (R$)</label>
+                      <CurrencyInput 
+                        value={form.purchase_price} 
+                        onChange={val => setForm({ ...form, purchase_price: val })} 
+                      />
+                    </div>
                 </div>
 
                 {form.purchase_quantity > 0 && form.purchase_price > 0 && (

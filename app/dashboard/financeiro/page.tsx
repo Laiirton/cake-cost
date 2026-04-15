@@ -1,8 +1,10 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil, Trash2, X, DollarSign, TrendingUp, TrendingDown } from 'lucide-react'
+import { formatCurrency, formatDate, parseCurrencyInput, formatCurrencyInput } from '@/lib/utils'
+import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
 
 interface CashEntry {
   id: string; kind: string; category: string; description: string; amount: number; occurred_on: string; order_id: string | null; display_order: number
@@ -23,7 +25,7 @@ export default function FinanceiroPage() {
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('cash_entries').select('*').order('occurred_on', { ascending: false })
@@ -43,10 +45,12 @@ export default function FinanceiroPage() {
     setSaving(true)
     try {
       if (editing) {
-        await supabase.from('cash_entries').update(form).eq('id', editing.id)
+        const { error } = await supabase.from('cash_entries').update(form).eq('id', editing.id)
+        if (error) throw error
         showToast('success', 'Lançamento atualizado!')
       } else {
-        await supabase.from('cash_entries').insert({ ...form, id: crypto.randomUUID() })
+        const { error } = await supabase.from('cash_entries').insert({ ...form, id: crypto.randomUUID() })
+        if (error) throw error
         showToast('success', 'Lançamento criado!')
       }
       setShowModal(false); load()
@@ -55,7 +59,14 @@ export default function FinanceiroPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir lançamento?')) return
-    await supabase.from('cash_entries').delete().eq('id', id); showToast('success', 'Excluído!'); load()
+    try {
+      const { error } = await supabase.from('cash_entries').delete().eq('id', id)
+      if (error) throw error
+      showToast('success', 'Excluído!')
+      load()
+    } catch {
+      showToast('error', 'Erro ao excluir')
+    }
   }
 
   const filtered = items.filter(i => {
@@ -67,9 +78,6 @@ export default function FinanceiroPage() {
   const totalIncome = items.filter(i => i.kind === 'income').reduce((s, i) => s + i.amount, 0)
   const totalExpense = items.filter(i => i.kind === 'expense').reduce((s, i) => s + i.amount, 0)
   const balance = totalIncome - totalExpense
-
-  const formatCurrency = (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
-  const formatDate = (d: string) => { try { return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') } catch { return d } }
 
   return (
     <div className="page-container">
@@ -119,10 +127,16 @@ export default function FinanceiroPage() {
                 <div className="form-group"><label className="form-label">Categoria</label><input className="form-input" value={(form.category as string) || ''} onChange={e => setForm({ ...form, category: e.target.value })} placeholder="Ex: Ingredientes, Vendas" /></div>
               </div>
               <div className="form-group"><label className="form-label">Descrição *</label><input className="form-input" value={(form.description as string) || ''} onChange={e => setForm({ ...form, description: e.target.value })} /></div>
-              <div className="form-row">
-                <div className="form-group"><label className="form-label">Valor (R$)</label><input className="form-input" type="number" step="0.01" value={(form.amount as number) || 0} onChange={e => setForm({ ...form, amount: parseFloat(e.target.value) || 0 })} /></div>
-                <div className="form-group"><label className="form-label">Data</label><input className="form-input" type="date" value={(form.occurred_on as string) || ''} onChange={e => setForm({ ...form, occurred_on: e.target.value })} /></div>
-              </div>
+               <div className="form-row">
+                 <div className="form-group">
+                   <label className="form-label">Valor (R$)</label>
+                   <CurrencyInput 
+                     value={(form.amount as number) || 0} 
+                     onChange={val => setForm({ ...form, amount: val })} 
+                   />
+                 </div>
+                 <div className="form-group"><label className="form-label">Data</label><input className="form-input" type="date" value={(form.occurred_on as string) || ''} onChange={e => setForm({ ...form, occurred_on: e.target.value })} /></div>
+               </div>
             </div>
             <div className="modal-footer"><button className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button><button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Salvando...' : editing ? 'Atualizar' : 'Criar'}</button></div>
           </div>

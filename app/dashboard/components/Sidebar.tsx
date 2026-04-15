@@ -71,12 +71,12 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
             <h2>Cake Cost</h2>
             <span>Gestão de Confeitaria</span>
           </div>
-          <button
-            className="btn-ghost btn-icon"
-            onClick={onClose}
-            style={{ marginLeft: 'auto', display: 'none', color: 'white' }}
-            id="close-sidebar-btn"
-          >
+           <button
+             className="btn-ghost btn-icon mobile-close-btn"
+             onClick={onClose}
+             style={{ marginLeft: 'auto', color: 'white' }}
+             id="close-sidebar-btn"
+           >
             <X size={20} />
           </button>
         </div>

@@ -718,6 +718,10 @@ h5 { font-size: 1rem; }
   flex-shrink: 0;
 }
 
+.mobile-close-btn {
+  display: none;
+}
+
 .sidebar-footer {
   padding: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -1016,6 +1020,9 @@ h5 { font-size: 1rem; }
 
 /* ==================== RESPONSIVE ==================== */
 @media (max-width: 1024px) {
+  .mobile-close-btn {
+    display: flex !important;
+  }
   .sidebar {
     transform: translateX(-100%);
   }

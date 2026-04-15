@@ -7,7 +7,7 @@ import {
   BookOpen, Wheat, ArrowRight, AlertCircle,
 } from 'lucide-react'
 import Link from 'next/link'
-import { formatCurrency, calculateRecipeTotalCost, type Ingredient, type RecipeItem } from '@/lib/utils'
+import { formatCurrency, calculateRecipeTotalCost, formatDate, formatDateTime, type Ingredient, type RecipeItem } from '@/lib/utils'
 
 interface DashboardData {
   totalOrders: number
@@ -40,7 +40,7 @@ export default function DashboardPage() {
   })
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [loading, setLoading] = useState(true)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const ingredientsMap = useMemo(() => {
     const m = new Map<string, Ingredient>()
@@ -102,15 +102,7 @@ export default function DashboardPage() {
 
   useEffect(() => { load() }, [load])
 
-  const formatDate = (dateStr: string) => {
-    try { return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) }
-    catch { return dateStr }
-  }
 
-  const formatDatetime = (dateStr: string) => {
-    try { return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) }
-    catch { return dateStr }
-  }
 
   const statusLabels: Record<string, string> = {
     pending: 'Pendente', confirmed: 'Confirmado', in_progress: 'Em Produção',
@@ -210,43 +202,43 @@ export default function DashboardPage() {
                         <div style={{ fontWeight: 600 }}>{order.title}</div>
                         <div className="text-xs text-muted">{order.customers?.name}</div>
                       </td>
-                      <td className="text-sm">{formatDate(order.event_date)}</td>
-                      <td><span className={`badge ${getStatusBadge(order.status)}`}>{statusLabels[order.status] || order.status}</span></td>
-                      <td className="text-right font-semibold">{formatCurrency(order.sale_price)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
-
-        {/* Tasks + Quick Recipes */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          {/* Upcoming Tasks */}
-          <div className="card">
-            <div className="card-header">
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Clock size={18} /> Produção Pendente</h3>
-              <Link href="/dashboard/producao" className="btn btn-ghost btn-sm">Ver <ArrowRight size={14} /></Link>
-            </div>
-            <div className="card-body" style={{ padding: 0 }}>
-              {data.upcomingTasks.length === 0 ? (
-                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Nenhuma tarefa pendente ✅</div>
-              ) : (
-                <div style={{ padding: '4px 0' }}>
-                  {data.upcomingTasks.map(task => (
-                    <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 24px', borderBottom: '1px solid var(--border-light)' }}>
-                      <span className={`badge ${getStatusBadge(task.status)}`} style={{ minWidth: 60, textAlign: 'center' }}>{statusLabels[task.status]}</span>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="font-semibold text-sm truncate">{task.title}</div>
-                        <div className="text-xs text-muted">{task.orders?.title} • {formatDatetime(task.due_at)}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
+                   <td className="text-sm">{formatDate(order.event_date)}</td>
+                       <td><span className={`badge ${getStatusBadge(order.status)}`}>{statusLabels[order.status] || order.status}</span></td>
+                       <td className="text-right font-semibold">{formatCurrency(order.sale_price)}</td>
+                     </tr>
+                   ))}
+                 </tbody>
+               </table>
+             )}
+           </div>
+         </div>
+ 
+         {/* Tasks + Quick Recipes */}
+         <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+           {/* Upcoming Tasks */}
+           <div className="card">
+             <div className="card-header">
+               <h3 style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Clock size={18} /> Produção Pendente</h3>
+               <Link href="/dashboard/producao" className="btn btn-ghost btn-sm">Ver <ArrowRight size={14} /></Link>
+             </div>
+             <div className="card-body" style={{ padding: 0 }}>
+               {data.upcomingTasks.length === 0 ? (
+                 <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.875rem' }}>Nenhuma tarefa pendente ✅</div>
+               ) : (
+                 <div style={{ padding: '4px 0' }}>
+                   {data.upcomingTasks.map(task => (
+                     <div key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 24px', borderBottom: '1px solid var(--border-light)' }}>
+                       <span className={`badge ${getStatusBadge(task.status)}`} style={{ minWidth: 60, textAlign: 'center' }}>{statusLabels[task.status]}</span>
+                       <div style={{ flex: 1, minWidth: 0 }}>
+                         <div className="font-semibold text-sm truncate">{task.title}</div>
+                         <div className="text-xs text-muted">{task.orders?.title} • {formatDateTime(task.due_at)}</div>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               )}
+             </div>
+           </div>
 
           {/* Recent Recipes with Cost */}
           <div className="card">

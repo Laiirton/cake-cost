@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Pencil, Trash2, X, ListChecks } from 'lucide-react'
 
@@ -27,7 +27,7 @@ export default function ProducaoPage() {
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [filter, setFilter] = useState('all')
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const load = useCallback(async () => {
     const [tasksRes, ordersRes] = await Promise.all([
@@ -52,10 +52,12 @@ export default function ProducaoPage() {
     try {
       const payload = { ...form, due_at: (form.due_at as string) ? new Date(form.due_at as string).toISOString() : new Date().toISOString() }
       if (editing) {
-        await supabase.from('production_tasks').update(payload).eq('id', editing.id)
+        const { error } = await supabase.from('production_tasks').update(payload).eq('id', editing.id)
+        if (error) throw error
         showToast('success', 'Tarefa atualizada!')
       } else {
-        await supabase.from('production_tasks').insert({ ...payload, id: crypto.randomUUID() })
+        const { error } = await supabase.from('production_tasks').insert({ ...payload, id: crypto.randomUUID() })
+        if (error) throw error
         showToast('success', 'Tarefa criada!')
       }
       setShowModal(false); load()
@@ -64,13 +66,27 @@ export default function ProducaoPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir tarefa?')) return
-    await supabase.from('production_tasks').delete().eq('id', id); showToast('success', 'Excluída!'); load()
+    try {
+      const { error } = await supabase.from('production_tasks').delete().eq('id', id)
+      if (error) throw error
+      showToast('success', 'Excluída!')
+      load()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Erro desconhecido'
+      showToast('error', `Erro ao excluir: ${msg}`)
+    }
   }
 
   const toggleStatus = async (task: Task) => {
     const next = task.status === 'todo' ? 'doing' : task.status === 'doing' ? 'done' : 'todo'
-    await supabase.from('production_tasks').update({ status: next }).eq('id', task.id)
-    load()
+    try {
+      const { error } = await supabase.from('production_tasks').update({ status: next }).eq('id', task.id)
+      if (error) throw error
+      load()
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : (err as { message?: string })?.message || 'Erro desconhecido'
+      showToast('error', `Erro ao alterar status: ${msg}`)
+    }
   }
 
   const filtered = filter === 'all' ? items : items.filter(i => i.status === filter)

@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil, Trash2, X, Users } from 'lucide-react'
+import { formatPhoneInput } from '@/lib/utils'
 
 interface Customer {
   id: string
@@ -25,7 +26,7 @@ export default function ClientesPage() {
   const [form, setForm] = useState(emptyCustomer)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('customers').select('*').order('name')
@@ -117,7 +118,7 @@ export default function ClientesPage() {
             <div className="modal-body">
               <div className="form-group"><label className="form-label">Nome *</label><input className="form-input" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} /></div>
               <div className="form-row">
-                <div className="form-group"><label className="form-label">Telefone</label><input className="form-input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="(00) 00000-0000" /></div>
+                <div className="form-group"><label className="form-label">Telefone</label><input className="form-input" value={form.phone} onChange={e => setForm({ ...form, phone: formatPhoneInput(e.target.value) })} placeholder="(00) 00000-0000" /></div>
                 <div className="form-group"><label className="form-label">Instagram</label><input className="form-input" value={form.instagram} onChange={e => setForm({ ...form, instagram: e.target.value })} placeholder="@usuario" /></div>
               </div>
               <div className="form-group"><label className="form-label">Bairro</label><input className="form-input" value={form.neighborhood} onChange={e => setForm({ ...form, neighborhood: e.target.value })} /></div>

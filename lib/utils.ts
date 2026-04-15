@@ -11,9 +11,28 @@ export function formatCurrency(value: number): string {
 }
 
 /**
+ * Format a string as phone mask (XX) XXXXX-XXXX
+ */
+export function formatPhone(value: string): string {
+  const numbers = value.replace(/\D/g, '')
+  if (numbers.length <= 10) {
+    return numbers.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3')
+  }
+  return numbers.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3')
+}
+
+/**
+ * Clean currency string to number
+ */
+export function parseCurrency(value: string): number {
+  return Number(value.replace(/\D/g, '')) / 100
+}
+
+/**
  * Format a date string to Brazilian format
  */
 export function formatDate(dateStr: string): string {
+  if (!dateStr) return '-'
   try {
     return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR')
   } catch {
@@ -74,13 +93,68 @@ export const RECIPE_SECTIONS = [
 ]
 
 /**
+ * Format a phone number with mask (XX) XXXXX-XXXX or (XX) XXXX-XXXX
+ */
+export function formatPhoneInput(value: string): string {
+  const numbers = value.replace(/\D/g, '').slice(0, 11)
+  if (numbers.length <= 10) {
+    // (XX) XXXX-XXXX
+    return numbers
+      .replace(/(\d{0,2})(\d{0,4})(\d{0,4})/, (_, p1, p2, p3) => {
+        if (!p2) return p1 ? `(${p1}` : ''
+        if (!p3) return `(${p1}) ${p2}`
+        return `(${p1}) ${p2}-${p3}`
+      })
+  }
+  // (XX) XXXXX-XXXX
+  return numbers
+    .replace(/(\d{0,2})(\d{0,5})(\d{0,4})/, (_, p1, p2, p3) => {
+      if (!p2) return p1 ? `(${p1}` : ''
+      if (!p3) return `(${p1}) ${p2}`
+      return `(${p1}) ${p2}-${p3}`
+    })
+}
+
+/**
+ * Clean phone string to only numbers
+ */
+export function cleanPhone(value: string): string {
+  return value.replace(/\D/g, '')
+}
+
+/**
+ * Format a number as currency input with R$ mask
+ */
+export function formatCurrencyInput(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) || 0 : value
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  }).format(num)
+}
+
+/**
+ * Parse currency string to number (removes formatting)
+ */
+export function parseCurrencyInput(value: string): number {
+  return Number(value.replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')) || 0
+}
+
+/**
  * Calculate the cost of a recipe item based on ingredient purchase info.
  * cost = (quantity_used / purchase_quantity) × purchase_price
  *
  * Handles basic unit conversion:
  *  - If recipe uses "g" and ingredient is in "kg" → divide by 1000
+ *  - If recipe uses "kg" and ingredient is in "g" → multiply by 1000
  *  - If recipe uses "ml" and ingredient is in "L" → divide by 1000
+ *  - If recipe uses "L" and ingredient is in "ml" → multiply by 1000
+ *  - If recipe uses "un" and ingredient is in "dz" → divide by 12
+ *  - If recipe uses "dz" and ingredient is in "un" → multiply by 12
  *  - Otherwise assumes same unit
+ *
+ * NOTE: "colher" and "xíc" (household units) do not convert automatically
+ * as their weights vary significantly by ingredient.
  */
 export function calculateItemCost(
   item: RecipeItem,
@@ -97,6 +171,8 @@ export function calculateItemCost(
   else if (ru === 'kg' && iu === 'g') adjustedQty = item.quantity * 1000
   else if (ru === 'ml' && iu === 'l') adjustedQty = item.quantity / 1000
   else if (ru === 'l' && iu === 'ml') adjustedQty = item.quantity * 1000
+  else if (ru === 'un' && iu === 'dz') adjustedQty = item.quantity / 12
+  else if (ru === 'dz' && iu === 'un') adjustedQty = item.quantity * 12
 
   return (adjustedQty / ingredient.purchase_quantity) * ingredient.purchase_price
 }

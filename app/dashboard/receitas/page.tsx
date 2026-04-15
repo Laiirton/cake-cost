@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import {
-  Plus, Search, Pencil, Trash2, X, BookOpen, ChevronDown, ChevronRight, GripVertical,
+  Plus, Search, Pencil, Trash2, X, BookOpen, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import {
   formatCurrency, calculateItemCost, calculateSectionCost, calculateRecipeTotalCost,
@@ -43,7 +43,7 @@ export default function ReceitasPage() {
     new Set(RECIPE_SECTIONS.map(s => s.key))
   )
 
-  const supabase = createClient()
+  const supabase = useMemo(() => createClient(), [])
 
   const ingredientsMap = useMemo(() => {
     const m = new Map<string, Ingredient>()
