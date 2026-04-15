@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { DollarSign, Pencil, Plus, Search, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useTransientToast } from '@/lib/hooks/useTransientToast'
+import { getBrowserClient } from '@/lib/supabase/client'
 import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
 import { formatCurrency, formatDate, getErrorMessage } from '@/lib/utils'
 import { getOrderRemainingBalance, getOrderTimelineDate, isPaymentOpen } from '@/lib/bakery'
@@ -102,7 +103,6 @@ export default function FinanceiroPage() {
   const [editing, setEditing] = useState<CashEntry | null>(null)
   const [form, setForm] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [periodMode, setPeriodMode] = useState<PeriodMode>('all')
   const [selectedMonth, setSelectedMonth] = useState(() => getCurrentMonthValue())
   const [customStart, setCustomStart] = useState(() => {
@@ -114,15 +114,11 @@ export default function FinanceiroPage() {
     return toLocalDateInputValue(new Date(now.getFullYear(), now.getMonth() + 1, 0))
   })
   const [formError, setFormError] = useState('')
-  const supabase = useMemo(() => createClient(), [])
-
-  const showToast = useCallback((type: string, message: string) => {
-    setToast({ type, message })
-    setTimeout(() => setToast(null), 3000)
-  }, [])
+  const { toast, showToast } = useTransientToast()
 
   const load = useCallback(async () => {
     try {
+      const supabase = await getBrowserClient()
       const [cashRes, ordersRes] = await Promise.all([
         supabase.from('cash_entries').select('*').order('occurred_on', { ascending: false }),
         supabase
@@ -132,7 +128,7 @@ export default function FinanceiroPage() {
       ])
       setItems((cashRes.data || []) as CashEntry[])
       setOrders(
-        (ordersRes.data || []).map((order) => ({
+        (ordersRes.data || []).map((order: OrderSummary) => ({
           ...order,
           customers: Array.isArray(order.customers) ? order.customers[0] : order.customers,
         })) as OrderSummary[]
@@ -143,7 +139,7 @@ export default function FinanceiroPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, supabase])
+  }, [showToast])
 
   useEffect(() => {
     load()
@@ -221,6 +217,7 @@ export default function FinanceiroPage() {
     setFormError('')
 
     try {
+      const supabase = await getBrowserClient()
       if (editing) {
         const { error } = await supabase.from('cash_entries').update(form).eq('id', editing.id)
         if (error) throw error
@@ -244,6 +241,7 @@ export default function FinanceiroPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir lançamento?')) return
     try {
+      const supabase = await getBrowserClient()
       const { error } = await supabase.from('cash_entries').delete().eq('id', id)
       if (error) throw error
       showToast('success', 'Lançamento excluído!')
@@ -261,14 +259,14 @@ export default function FinanceiroPage() {
     return matchSearch && matchKind
   })
 
-  const manualIncome = scopedItems.filter((item) => item.kind === 'income').reduce((sum, item) => sum + item.amount, 0)
-  const manualExpense = scopedItems.filter((item) => item.kind === 'expense').reduce((sum, item) => sum + item.amount, 0)
+  const manualIncome = scopedItems.filter((item) => item.kind === 'income').reduce((sum: number, item) => sum + item.amount, 0)
+  const manualExpense = scopedItems.filter((item) => item.kind === 'expense').reduce((sum: number, item) => sum + item.amount, 0)
   const manualBalance = manualIncome - manualExpense
-  const orderSales = scopedOrders.filter((order) => order.status !== 'cancelled').reduce((sum, order) => sum + order.sale_price, 0)
-  const orderDeposits = scopedOrders.filter((order) => order.status !== 'cancelled').reduce((sum, order) => sum + order.deposit_amount, 0)
+  const orderSales = scopedOrders.filter((order) => order.status !== 'cancelled').reduce((sum: number, order) => sum + order.sale_price, 0)
+  const orderDeposits = scopedOrders.filter((order) => order.status !== 'cancelled').reduce((sum: number, order) => sum + order.deposit_amount, 0)
   const receivables = scopedOrders
     .filter((order) => order.status !== 'cancelled' && isPaymentOpen(order.payment_status))
-    .reduce((sum, order) => sum + getOrderRemainingBalance(order), 0)
+    .reduce((sum: number, order) => sum + getOrderRemainingBalance(order), 0)
   const pendingOrders = scopedOrders.filter((order) => order.status !== 'cancelled' && isPaymentOpen(order.payment_status))
 
   if (loading) {

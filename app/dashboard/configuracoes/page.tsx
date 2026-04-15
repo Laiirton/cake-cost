@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState, useCallback } from 'react'
+import { useTransientToast } from '@/lib/hooks/useTransientToast'
+import { getBrowserClient } from '@/lib/supabase/client'
 import { Settings, Save } from 'lucide-react'
 import { formatPhoneInput } from '@/lib/utils'
 import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
@@ -40,22 +41,21 @@ export default function ConfiguracoesPage() {
   const [form, setForm] = useState<BakerySettings>(defaultSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
-  const supabase = useMemo(() => createClient(), [])
+  const { toast, showToast } = useTransientToast()
 
   const load = useCallback(async () => {
+    const supabase = await getBrowserClient()
     const { data } = await supabase.from('bakery_settings').select('*').limit(1).single()
     if (data) setForm(data)
     setLoading(false)
-  }, [supabase])
+  }, [])
 
   useEffect(() => { load() }, [load])
-
-  const showToast = (type: string, message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 3000) }
 
   const handleSave = async () => {
     setSaving(true)
     try {
+      const supabase = await getBrowserClient()
       const { error } = await supabase.from('bakery_settings').upsert(form)
       if (error) throw error
       showToast('success', 'Configurações salvas com sucesso!')

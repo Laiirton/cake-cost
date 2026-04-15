@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
   AlertCircle,
@@ -15,7 +15,7 @@ import {
   Users,
   Wheat,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { getBrowserClient } from '@/lib/supabase/client'
 import { formatCurrency, formatDate, formatDateTime } from '@/lib/utils'
 import {
   getOrderRemainingBalance,
@@ -122,10 +122,10 @@ export default function DashboardPage() {
     settings: null,
   })
   const [loading, setLoading] = useState(true)
-  const supabase = useMemo(() => createClient(), [])
 
   const load = useCallback(async () => {
     try {
+      const supabase = await getBrowserClient()
       const now = new Date()
       const currentYear = now.getFullYear()
       const today = now.toISOString().split('T')[0]
@@ -174,28 +174,28 @@ export default function DashboardPage() {
         supabase.from('bakery_settings').select('business_name').limit(1).single(),
       ])
 
-      const orders = (ordersRes.data || []).map((order) => ({
+      const orders = (ordersRes.data || []).map((order: OrderSummary) => ({
         ...order,
         customers: Array.isArray(order.customers) ? order.customers[0] : order.customers,
       })) as OrderSummary[]
-      const tasks = (tasksRes.data || []).map((task) => ({
+      const tasks = (tasksRes.data || []).map((task: TaskSummary) => ({
         ...task,
         orders: Array.isArray(task.orders) ? task.orders[0] : task.orders,
       })) as TaskSummary[]
       const activeOrders = orders.filter((order) => isOrderActive(order.status))
       const pendingReceivables = orders
         .filter((order) => order.status !== 'cancelled' && isPaymentOpen(order.payment_status))
-        .reduce((sum, order) => sum + getOrderRemainingBalance(order), 0)
+        .reduce((sum: number, order) => sum + getOrderRemainingBalance(order), 0)
       const monthSales = orders
         .filter((order) => order.status !== 'cancelled')
         .filter((order) => {
           const timeline = getOrderTimelineDate(order)
           return timeline >= firstDayOfMonth && timeline <= lastDayOfMonth
         })
-        .reduce((sum, order) => sum + (order.sale_price || 0), 0)
+        .reduce((sum: number, order) => sum + (order.sale_price || 0), 0)
       const monthCashBalance =
-        (monthIncomeRes.data || []).reduce((sum, entry) => sum + (entry.amount || 0), 0) -
-        (monthExpenseRes.data || []).reduce((sum, entry) => sum + (entry.amount || 0), 0)
+        (monthIncomeRes.data || []).reduce((sum: number, entry: { amount: number }) => sum + (entry.amount || 0), 0) -
+        (monthExpenseRes.data || []).reduce((sum: number, entry: { amount: number }) => sum + (entry.amount || 0), 0)
 
       setData({
         activeOrders: activeOrders.length,
@@ -219,7 +219,7 @@ export default function DashboardPage() {
           .filter((task) => task.status !== 'done')
           .slice(0, 6),
         staleIngredients: (ingredientsRes.data || [])
-          .filter((ingredient) => ingredient.updated_year < currentYear)
+          .filter((ingredient: IngredientAlert) => ingredient.updated_year < currentYear)
           .slice(0, 5),
         settings: settingsRes.data ? { business_name: settingsRes.data.business_name } : null,
       })
@@ -228,7 +228,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [supabase])
+  }, [])
 
   useEffect(() => {
     load()

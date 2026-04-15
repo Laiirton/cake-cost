@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { useTransientToast } from '@/lib/hooks/useTransientToast'
+import { getBrowserClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil, Trash2, X, Users } from 'lucide-react'
 import { formatPhoneInput } from '@/lib/utils'
 
@@ -26,19 +27,17 @@ export default function ClientesPage() {
   const [editing, setEditing] = useState<Customer | null>(null)
   const [form, setForm] = useState(emptyCustomer)
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [formError, setFormError] = useState('')
-  const supabase = useMemo(() => createClient(), [])
+  const { toast, showToast } = useTransientToast()
 
   const load = useCallback(async () => {
+    const supabase = await getBrowserClient()
     const { data } = await supabase.from('customers').select('*').order('name')
     setItems(data || [])
     setLoading(false)
-  }, [supabase])
+  }, [])
 
   useEffect(() => { load() }, [load])
-
-  const showToast = (type: string, message: string) => { setToast({ type, message }); setTimeout(() => setToast(null), 3000) }
 
   const openNew = () => { setEditing(null); setFormError(''); setForm(emptyCustomer); setShowModal(true) }
   const openEdit = (item: Customer) => {
@@ -55,6 +54,7 @@ export default function ClientesPage() {
     }
     setSaving(true)
     try {
+      const supabase = await getBrowserClient()
       const payload = { ...form, instagram: form.instagram || null }
       if (editing) {
         const { error } = await supabase.from('customers').update(payload).eq('id', editing.id)
@@ -72,6 +72,7 @@ export default function ClientesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este cliente?')) return
     try {
+      const supabase = await getBrowserClient()
       await supabase.from('customers').delete().eq('id', id)
       showToast('success', 'Excluído!'); load()
     } catch { showToast('error', 'Erro ao excluir') }

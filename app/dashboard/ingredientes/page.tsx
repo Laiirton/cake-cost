@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState, useCallback } from 'react'
+import { useTransientToast } from '@/lib/hooks/useTransientToast'
+import { getBrowserClient } from '@/lib/supabase/client'
 import { Plus, Search, Pencil, Trash2, X, Wheat, ArrowUpDown } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
@@ -35,13 +36,13 @@ export default function IngredientesPage() {
   const [editing, setEditing] = useState<Ingredient | null>(null)
   const [form, setForm] = useState(emptyIngredient)
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [sortBy, setSortBy] = useState<'name' | 'price' | 'year'>('name')
   const [yearFilter, setYearFilter] = useState<'all' | 'current' | 'old'>('all')
   const [formError, setFormError] = useState('')
-  const supabase = useMemo(() => createClient(), [])
+  const { toast, showToast } = useTransientToast()
 
   const load = useCallback(async () => {
+    const supabase = await getBrowserClient()
     const { data, error } = await supabase.from('ingredients').select('*').order('display_order')
     if (error) {
       console.error('Erro ao carregar ingredientes:', error)
@@ -49,14 +50,9 @@ export default function IngredientesPage() {
     }
     setItems(data || [])
     setLoading(false)
-  }, [supabase])
+  }, [showToast])
 
   useEffect(() => { load() }, [load])
-
-  const showToast = (type: string, message: string) => {
-    setToast({ type, message })
-    setTimeout(() => setToast(null), 3000)
-  }
 
   const openNew = () => {
     setEditing(null)
@@ -87,6 +83,7 @@ export default function IngredientesPage() {
     }
     setSaving(true)
     try {
+      const supabase = await getBrowserClient()
       if (editing) {
         const { error } = await supabase.from('ingredients').update(form).eq('id', editing.id)
         if (error) throw error
@@ -107,6 +104,7 @@ export default function IngredientesPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir ingrediente? Receitas que usam este ingrediente podem ser afetadas.')) return
     try {
+      const supabase = await getBrowserClient()
       const { error } = await supabase.from('ingredients').delete().eq('id', id)
       if (error) throw error
       showToast('success', 'Ingrediente excluído!')
@@ -127,7 +125,7 @@ export default function IngredientesPage() {
       return a.name.localeCompare(b.name, 'pt-BR')
     })
 
-  const totalValue = items.reduce((sum, i) => sum + i.purchase_price, 0)
+  const totalValue = items.reduce((sum: number, i) => sum + i.purchase_price, 0)
 
   return (
     <div className="page-container">

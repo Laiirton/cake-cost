@@ -13,7 +13,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useTransientToast } from '@/lib/hooks/useTransientToast'
+import { getBrowserClient } from '@/lib/supabase/client'
 import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
 import { formatCurrency, formatDate, getErrorMessage, type Ingredient } from '@/lib/utils'
 import {
@@ -147,10 +148,9 @@ export default function PedidosPage() {
   const [editing, setEditing] = useState<Order | null>(null)
   const [form, setForm] = useState<OrderFormState>(createEmptyForm([], []))
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [formError, setFormError] = useState('')
   const [queryApplied, setQueryApplied] = useState(false)
-  const supabase = useMemo(() => createClient(), [])
+  const { toast, showToast } = useTransientToast()
 
   const recipesMap = useMemo(() => {
     const map = new Map<string, RecipeSummary>()
@@ -176,13 +176,9 @@ export default function PedidosPage() {
     ? buildOrderDraftFromPreset(selectedPreset, selectedRecipe, ingredientsMap)
     : null
 
-  const showToast = useCallback((type: string, message: string) => {
-    setToast({ type, message })
-    setTimeout(() => setToast(null), 3000)
-  }, [])
-
   const load = useCallback(async () => {
     try {
+      const supabase = await getBrowserClient()
       const [ordersRes, customersRes, presetsRes, recipesRes, ingredientsRes] = await Promise.all([
         supabase
           .from('orders')
@@ -198,19 +194,19 @@ export default function PedidosPage() {
       ])
 
       setItems(
-        (ordersRes.data || []).map((order) => ({
+        (ordersRes.data || []).map((order: Order) => ({
           ...order,
           customers: Array.isArray(order.customers) ? order.customers[0] : order.customers,
         })) as Order[]
       )
       setCustomers((customersRes.data || []) as Customer[])
       setPresets(
-        (presetsRes.data || []).map((preset) =>
+        (presetsRes.data || []).map((preset: Record<string, unknown>) =>
           normalizePreset(preset as unknown as Record<string, unknown>)
         )
       )
       setRecipes(
-        (recipesRes.data || []).map((recipe) => ({
+        (recipesRes.data || []).map((recipe: RecipeSummary) => ({
           ...recipe,
           items: Array.isArray(recipe.items) ? recipe.items : [],
         })) as RecipeSummary[]
@@ -222,7 +218,7 @@ export default function PedidosPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, supabase])
+  }, [showToast])
 
   useEffect(() => {
     load()
@@ -328,6 +324,7 @@ export default function PedidosPage() {
     const nextStatus = statusOptions[statusIndex + 1].value
 
     try {
+      const supabase = await getBrowserClient()
       const { error } = await supabase.from('orders').update({ status: nextStatus }).eq('id', order.id)
       if (error) throw error
       setItems((previous) =>
@@ -370,6 +367,7 @@ export default function PedidosPage() {
     setFormError('')
 
     try {
+      const supabase = await getBrowserClient()
       const payload = {
         customer_id: form.customer_id,
         preset_id: form.preset_id,
@@ -429,6 +427,7 @@ export default function PedidosPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir este pedido?')) return
     try {
+      const supabase = await getBrowserClient()
       const { error } = await supabase.from('orders').delete().eq('id', id)
       if (error) throw error
       showToast('success', 'Pedido excluído!')
@@ -460,9 +459,9 @@ export default function PedidosPage() {
   const weekAheadIso = weekAhead.toISOString().split('T')[0]
   const pendingReceivables = items
     .filter((item) => item.status !== 'cancelled' && isPaymentOpen(item.payment_status))
-    .reduce((sum, item) => sum + getOrderRemainingBalance(item), 0)
+    .reduce((sum: number, item) => sum + getOrderRemainingBalance(item), 0)
   const averageTicket =
-    items.filter((item) => item.status !== 'cancelled').reduce((sum, item) => sum + item.sale_price, 0) /
+    items.filter((item) => item.status !== 'cancelled').reduce((sum: number, item) => sum + item.sale_price, 0) /
     Math.max(items.filter((item) => item.status !== 'cancelled').length, 1)
 
   if (loading) {

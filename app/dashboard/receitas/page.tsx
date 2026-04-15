@@ -2,7 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/client'
+import { useTransientToast } from '@/lib/hooks/useTransientToast'
+import { getBrowserClient } from '@/lib/supabase/client'
 import {
   Plus, Search, Pencil, Trash2, X, BookOpen, ChevronDown, ChevronRight,
 } from 'lucide-react'
@@ -32,8 +33,8 @@ export default function ReceitasPage() {
   const [showEditor, setShowEditor] = useState(false)
   const [editing, setEditing] = useState<Recipe | null>(null)
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [formError, setFormError] = useState('')
+  const { toast, showToast } = useTransientToast()
 
   // Form state
   const [formName, setFormName] = useState('')
@@ -46,8 +47,6 @@ export default function ReceitasPage() {
     new Set(RECIPE_SECTIONS.map(s => s.key))
   )
 
-  const supabase = useMemo(() => createClient(), [])
-
   const ingredientsMap = useMemo(() => {
     const m = new Map<string, Ingredient>()
     ingredients.forEach(i => m.set(i.id, i))
@@ -55,6 +54,7 @@ export default function ReceitasPage() {
   }, [ingredients])
 
   const load = useCallback(async () => {
+    const supabase = await getBrowserClient()
     const [recipesRes, ingredientsRes] = await Promise.all([
       supabase.from('recipes').select('*').order('display_order'),
       supabase.from('ingredients').select('*').order('name'),
@@ -67,20 +67,15 @@ export default function ReceitasPage() {
       console.error('Erro ao carregar ingredientes:', ingredientsRes.error)
       showToast('error', `Erro ingredientes: ${ingredientsRes.error.message}`)
     }
-    setRecipes((recipesRes.data || []).map(r => ({
+    setRecipes((recipesRes.data || []).map((r: Recipe) => ({
       ...r,
       items: Array.isArray(r.items) ? r.items : [],
     })))
     setIngredients(ingredientsRes.data || [])
     setLoading(false)
-  }, [supabase])
+  }, [showToast])
 
   useEffect(() => { load() }, [load])
-
-  const showToast = (type: string, message: string) => {
-    setToast({ type, message })
-    setTimeout(() => setToast(null), 3000)
-  }
 
   const openNew = () => {
     setEditing(null)
@@ -119,6 +114,7 @@ export default function ReceitasPage() {
     setSaving(true)
     setFormError('')
     try {
+      const supabase = await getBrowserClient()
       const payload = {
         name: formName,
         category: formCategory,
@@ -151,6 +147,7 @@ export default function ReceitasPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir esta receita? Essa ação não pode ser desfeita.')) return
     try {
+      const supabase = await getBrowserClient()
       const { error } = await supabase.from('recipes').delete().eq('id', id)
       if (error) throw error
       showToast('success', 'Receita excluída!')

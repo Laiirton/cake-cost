@@ -16,7 +16,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useTransientToast } from '@/lib/hooks/useTransientToast'
+import { getBrowserClient } from '@/lib/supabase/client'
 import {
   calculateItemCost,
   calculatePricing,
@@ -814,8 +815,8 @@ export default function CalculadoraPage() {
   const [presets, setPresets] = useState<CalculatorPreset[]>([])
   const [defaults, setDefaults] = useState<SettingsDefaults>(emptyDefaults)
   const [loading, setLoading] = useState(true)
-  const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [queryApplied, setQueryApplied] = useState(false)
+  const { toast, showToast } = useTransientToast()
 
   const [selectedRecipeId, setSelectedRecipeId] = useState('')
   const [selectedPresetId, setSelectedPresetId] = useState('')
@@ -841,8 +842,6 @@ export default function CalculadoraPage() {
   const [presetError, setPresetError] = useState('')
   const [savingPreset, setSavingPreset] = useState(false)
   const [deletingPreset, setDeletingPreset] = useState(false)
-
-  const supabase = useMemo(() => createClient(), [])
 
   const recipesMap = useMemo(() => {
     const map = new Map<string, RecipeSummary>()
@@ -946,11 +945,6 @@ export default function CalculadoraPage() {
       })
   }, [presets, recipesMap, ingredientsMap, presetSearch])
 
-  const showToast = useCallback((type: string, message: string) => {
-    setToast({ type, message })
-    setTimeout(() => setToast(null), 3000)
-  }, [])
-
   const getDefaultExpandedSections = () => new Set(RECIPE_SECTIONS.map((section) => section.key))
 
   const resetSimulation = useCallback(
@@ -1008,6 +1002,7 @@ export default function CalculadoraPage() {
 
   const load = useCallback(async () => {
     try {
+      const supabase = await getBrowserClient()
       const [recipesRes, ingredientsRes, settingsRes, presetsRes] = await Promise.all([
         supabase
           .from('recipes')
@@ -1021,7 +1016,7 @@ export default function CalculadoraPage() {
           .order('display_order'),
       ])
 
-      const nextRecipes = (recipesRes.data || []).map((recipe) => ({
+      const nextRecipes = (recipesRes.data || []).map((recipe: RecipeSummary) => ({
         ...recipe,
         items: Array.isArray(recipe.items) ? recipe.items : [],
       })) as RecipeSummary[]
@@ -1036,7 +1031,7 @@ export default function CalculadoraPage() {
             markupPct: settingsRes.data.default_markup_pct,
           }
         : emptyDefaults
-      const nextPresets = (presetsRes.data || []).map((preset) =>
+      const nextPresets = (presetsRes.data || []).map((preset: Record<string, unknown>) =>
         normalizePreset(preset as unknown as Record<string, unknown>)
       )
 
@@ -1057,10 +1052,11 @@ export default function CalculadoraPage() {
       }
     } catch (error) {
       console.error('Erro ao carregar calculadora:', error)
-      showToast('error', 'Não foi possível carregar os modelos e receitas.')    } finally {
+      showToast('error', 'Não foi possível carregar os modelos e receitas.')
+    } finally {
       setLoading(false)
     }
-  }, [selectedRecipeId, showToast, supabase])
+  }, [selectedRecipeId, showToast])
 
   useEffect(() => {
     load()
@@ -1143,6 +1139,7 @@ export default function CalculadoraPage() {
     setPresetError('')
 
     try {
+      const supabase = await getBrowserClient()
       const payload = {
         id: crypto.randomUUID(),
         name: presetNameDraft.trim(),
@@ -1208,6 +1205,7 @@ export default function CalculadoraPage() {
         notes: modelNotes,
       }
 
+      const supabase = await getBrowserClient()
       const { data: updatedPreset, error } = await supabase
         .from('calculator_presets')
         .update(payload)
@@ -1236,6 +1234,7 @@ export default function CalculadoraPage() {
 
     setDeletingPreset(true)
     try {
+      const supabase = await getBrowserClient()
       const { count, error: countError } = await supabase
         .from('orders')
         .select('id', { count: 'exact', head: true })

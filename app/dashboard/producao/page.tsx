@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { AlertCircle, Clock, ListChecks, Pencil, Plus, Trash2, X } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useTransientToast } from '@/lib/hooks/useTransientToast'
+import { getBrowserClient } from '@/lib/supabase/client'
 import { formatDateTime, getErrorMessage } from '@/lib/utils'
 import { formatLocalDateTimeInput, parseLocalDateTimeInput } from '@/lib/bakery'
 
@@ -65,19 +66,14 @@ export default function ProducaoPage() {
     display_order: 0,
   })
   const [saving, setSaving] = useState(false)
-  const [toast, setToast] = useState<{ type: string; message: string } | null>(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [timeFilter, setTimeFilter] = useState<'all' | 'today' | 'week' | 'overdue'>('all')
   const [formError, setFormError] = useState('')
-  const supabase = useMemo(() => createClient(), [])
-
-  const showToast = useCallback((type: string, message: string) => {
-    setToast({ type, message })
-    setTimeout(() => setToast(null), 3000)
-  }, [])
+  const { toast, showToast } = useTransientToast()
 
   const load = useCallback(async () => {
     try {
+      const supabase = await getBrowserClient()
       const [tasksRes, ordersRes] = await Promise.all([
         supabase.from('production_tasks').select('*, orders(title)').order('due_at'),
         supabase.from('orders').select('id, title').order('event_date', { ascending: false }),
@@ -90,7 +86,7 @@ export default function ProducaoPage() {
     } finally {
       setLoading(false)
     }
-  }, [showToast, supabase])
+  }, [showToast])
 
   useEffect(() => {
     load()
@@ -141,6 +137,7 @@ export default function ProducaoPage() {
     setFormError('')
 
     try {
+      const supabase = await getBrowserClient()
       const payload = {
         order_id: form.order_id || null,
         title: form.title.trim(),
@@ -175,6 +172,7 @@ export default function ProducaoPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Excluir tarefa?')) return
     try {
+      const supabase = await getBrowserClient()
       const { error } = await supabase.from('production_tasks').delete().eq('id', id)
       if (error) throw error
       showToast('success', 'Tarefa excluída!')
@@ -186,6 +184,7 @@ export default function ProducaoPage() {
 
   const moveTask = async (task: Task, nextStatus: string) => {
     try {
+      const supabase = await getBrowserClient()
       const { error } = await supabase.from('production_tasks').update({ status: nextStatus }).eq('id', task.id)
       if (error) throw error
       setItems((previous) =>
