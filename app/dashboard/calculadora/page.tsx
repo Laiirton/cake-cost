@@ -29,6 +29,7 @@ import {
 import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
 import {
   calculatePresetPricing,
+  buildPresetAdjustments,
   normalizePreset,
   parseYieldToServings,
   type CalculatorPreset,
@@ -207,7 +208,7 @@ export default function CalculadoraPage() {
       setPackagingCost(preset.packaging_cost)
       setDeliveryCost(preset.delivery_cost)
       setMarkupPct(preset.markup_pct)
-      setManualPrice(null)
+      setManualPrice(preset.target_sale_price && preset.target_sale_price > 0 ? preset.target_sale_price : null)
       setExtraItems(
         preset.extra_items.map((item) => ({
           uid: item.uid || uid(),
@@ -229,7 +230,10 @@ export default function CalculadoraPage() {
           .order('name'),
         supabase.from('ingredients').select('*').order('name'),
         supabase.from('bakery_settings').select('*').limit(1).single(),
-        supabase.from('calculator_presets').select('*').order('display_order'),
+        supabase
+          .from('calculator_presets')
+          .select('id, name, size_label, servings, recipe_ids, adjustments, labor_hours, labor_hour_rate, fixed_cost, markup_pct, target_sale_price, notes, display_order')
+          .order('display_order'),
       ])
 
       const nextRecipes = (recipesRes.data || []).map((recipe) => ({
@@ -358,18 +362,19 @@ export default function CalculadoraPage() {
       const payload = {
         id: crypto.randomUUID(),
         name: presetNameDraft.trim(),
-        recipe_id: selectedRecipe.id,
+        recipe_ids: [selectedRecipe.id],
         size_label: selectedRecipe.size_label,
         servings: servingsTarget,
         markup_pct: markupPct,
         labor_hours: laborHours,
         labor_hour_rate: laborRate,
         fixed_cost: Number(pricing.fixedCostPerOrder.toFixed(2)),
-        packaging_cost: packagingCost,
-        delivery_cost: deliveryCost,
-        extra_items: extraItems
-          .filter((item) => item.name.trim() || item.cost > 0)
-          .map(({ uid: itemUid, ...item }) => ({ ...item, uid: itemUid })),
+        adjustments: buildPresetAdjustments({
+          packagingCost,
+          deliveryCost,
+          extraItems,
+        }),
+        target_sale_price: Number(pricing.salePrice.toFixed(2)),
         notes: modelNotes,
         display_order: presets.length,
       }
@@ -403,18 +408,19 @@ export default function CalculadoraPage() {
     try {
       const payload = {
         name: selectedPreset.name,
-        recipe_id: selectedRecipe.id,
+        recipe_ids: [selectedRecipe.id],
         size_label: selectedRecipe.size_label,
         servings: servingsTarget,
         markup_pct: markupPct,
         labor_hours: laborHours,
         labor_hour_rate: laborRate,
         fixed_cost: Number(pricing.fixedCostPerOrder.toFixed(2)),
-        packaging_cost: packagingCost,
-        delivery_cost: deliveryCost,
-        extra_items: extraItems
-          .filter((item) => item.name.trim() || item.cost > 0)
-          .map(({ uid: itemUid, ...item }) => ({ ...item, uid: itemUid })),
+        adjustments: buildPresetAdjustments({
+          packagingCost,
+          deliveryCost,
+          extraItems,
+        }),
+        target_sale_price: Number(pricing.salePrice.toFixed(2)),
         notes: modelNotes,
       }
 
@@ -446,6 +452,21 @@ export default function CalculadoraPage() {
 
     setDeletingPreset(true)
     try {
+      const { count, error: countError } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('preset_id', selectedPreset.id)
+
+      if (countError) throw countError
+
+      if ((count || 0) > 0) {
+        showToast(
+          'error',
+          `Este modelo ainda esta vinculado a ${count} pedido${count === 1 ? '' : 's'}. Troque o modelo dos pedidos antes de excluir.`
+        )
+        return
+      }
+
       const { error } = await supabase.from('calculator_presets').delete().eq('id', selectedPreset.id)
       if (error) throw error
 
@@ -556,7 +577,7 @@ export default function CalculadoraPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                         <span className="badge badge-neutral">{preset.servings || parseYieldToServings(recipe?.yield_label || '')} porcoes</span>
                         <span style={{ fontWeight: 700, color: 'var(--brand-600)' }}>
-                          {formatCurrency(presetPricing?.suggestedPrice || 0)}
+                          {formatCurrency(presetPricing?.salePrice || 0)}
                         </span>
                       </div>
                     </button>

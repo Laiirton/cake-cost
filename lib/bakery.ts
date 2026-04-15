@@ -20,10 +20,20 @@ export interface ExtraCostItem {
   cost: number
 }
 
+export type PresetAdjustmentKind = 'extra' | 'packaging' | 'delivery'
+
+export interface PresetAdjustment {
+  uid?: string
+  kind: PresetAdjustmentKind
+  name: string
+  cost: number
+}
+
 export interface CalculatorPreset {
   id: string
   name: string
   recipe_id: string
+  recipe_ids: string[]
   size_label: string
   servings: number
   markup_pct: number
@@ -33,6 +43,8 @@ export interface CalculatorPreset {
   packaging_cost: number
   delivery_cost: number
   extra_items: ExtraCostItem[]
+  adjustments: PresetAdjustment[]
+  target_sale_price: number | null
   notes: string
   display_order: number
 }
@@ -72,20 +84,124 @@ function normalizeExtraItems(items: unknown): ExtraCostItem[] {
   }, [])
 }
 
+function normalizeMaybeNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function normalizeRecipeIds(raw: Record<string, unknown>): string[] {
+  if (Array.isArray(raw.recipe_ids)) {
+    return raw.recipe_ids.filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+  }
+
+  if (typeof raw.recipe_id === 'string' && raw.recipe_id.trim()) {
+    return [raw.recipe_id]
+  }
+
+  return []
+}
+
+function normalizeAdjustmentKind(kind: unknown, name: string): PresetAdjustmentKind {
+  if (kind === 'packaging' || kind === 'delivery' || kind === 'extra') {
+    return kind
+  }
+
+  const normalizedName = name.trim().toLowerCase()
+  if (normalizedName === 'embalagem') return 'packaging'
+  if (normalizedName === 'entrega' || normalizedName === 'frete') return 'delivery'
+  return 'extra'
+}
+
+function normalizePresetAdjustments(items: unknown): PresetAdjustment[] {
+  if (!Array.isArray(items)) return []
+
+  return items.reduce<PresetAdjustment[]>((accumulator, item) => {
+    if (!item || typeof item !== 'object') return accumulator
+    const parsed = item as { uid?: unknown; kind?: unknown; name?: unknown; cost?: unknown }
+    const name = typeof parsed.name === 'string' ? parsed.name : ''
+    accumulator.push({
+      uid: typeof parsed.uid === 'string' ? parsed.uid : undefined,
+      kind: normalizeAdjustmentKind(parsed.kind, name),
+      name,
+      cost: typeof parsed.cost === 'number' ? parsed.cost : Number(parsed.cost) || 0,
+    })
+    return accumulator
+  }, [])
+}
+
+function getAdjustmentCost(adjustments: PresetAdjustment[], kind: PresetAdjustmentKind): number {
+  return adjustments.find((adjustment) => adjustment.kind === kind)?.cost || 0
+}
+
+export function buildPresetAdjustments(params: {
+  packagingCost: number
+  deliveryCost: number
+  extraItems: ExtraCostItem[]
+}): PresetAdjustment[] {
+  const adjustments: PresetAdjustment[] = []
+
+  if (params.packagingCost > 0) {
+    adjustments.push({
+      kind: 'packaging',
+      name: 'Embalagem',
+      cost: params.packagingCost,
+    })
+  }
+
+  if (params.deliveryCost > 0) {
+    adjustments.push({
+      kind: 'delivery',
+      name: 'Entrega',
+      cost: params.deliveryCost,
+    })
+  }
+
+  params.extraItems
+    .filter((item) => item.name.trim() || item.cost > 0)
+    .forEach((item) => {
+      adjustments.push({
+        uid: item.uid,
+        kind: 'extra',
+        name: item.name,
+        cost: item.cost,
+      })
+    })
+
+  return adjustments
+}
+
 export function normalizePreset(raw: Record<string, unknown>): CalculatorPreset {
+  const adjustmentsSource =
+    Array.isArray(raw.adjustments) && raw.adjustments.length > 0 ? raw.adjustments : raw.extra_items
+  const adjustments = normalizePresetAdjustments(adjustmentsSource)
+  const recipeIds = normalizeRecipeIds(raw)
+  const packagingCost = getAdjustmentCost(adjustments, 'packaging') || Number(raw.packaging_cost) || 0
+  const deliveryCost = getAdjustmentCost(adjustments, 'delivery') || Number(raw.delivery_cost) || 0
+  const extraItems = adjustments
+    .filter((adjustment) => adjustment.kind === 'extra')
+    .map(({ uid, name, cost }) => ({
+      uid,
+      name,
+      cost,
+    }))
+
   return {
     id: String(raw.id || ''),
     name: String(raw.name || ''),
-    recipe_id: String(raw.recipe_id || ''),
+    recipe_id: recipeIds[0] || '',
+    recipe_ids: recipeIds,
     size_label: String(raw.size_label || ''),
     servings: Number(raw.servings) || 0,
     markup_pct: Number(raw.markup_pct) || 0,
     labor_hours: Number(raw.labor_hours) || 0,
     labor_hour_rate: Number(raw.labor_hour_rate) || 0,
     fixed_cost: Number(raw.fixed_cost) || 0,
-    packaging_cost: Number(raw.packaging_cost) || 0,
-    delivery_cost: Number(raw.delivery_cost) || 0,
-    extra_items: normalizeExtraItems(raw.extra_items),
+    packaging_cost: packagingCost,
+    delivery_cost: deliveryCost,
+    extra_items: extraItems.length > 0 ? extraItems : normalizeExtraItems(raw.extra_items),
+    adjustments,
+    target_sale_price: normalizeMaybeNumber(raw.target_sale_price),
     notes: String(raw.notes || ''),
     display_order: Number(raw.display_order) || 0,
   }
@@ -134,6 +250,7 @@ export function calculatePresetPricing(
     packagingCost: preset.packaging_cost,
     deliveryCost: preset.delivery_cost,
     markupPct: preset.markup_pct,
+    salePrice: preset.target_sale_price && preset.target_sale_price > 0 ? preset.target_sale_price : undefined,
   })
 }
 
@@ -152,7 +269,7 @@ export function buildOrderDraftFromPreset(
     title,
     size_label: sizeLabel,
     servings,
-    sale_price: pricing ? Number(pricing.suggestedPrice.toFixed(2)) : 0,
+    sale_price: pricing ? Number(pricing.salePrice.toFixed(2)) : 0,
     notes: preset.notes || '',
     pricing,
   }
