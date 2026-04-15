@@ -470,6 +470,23 @@ h5 { font-size: 1rem; }
   margin-top: 4px;
 }
 
+.form-group.has-error .form-label {
+  color: var(--danger-600);
+}
+
+.form-group.has-error .form-input,
+.form-group.has-error .form-select,
+.form-group.has-error .form-textarea,
+.form-group.has-error .currency-field-prefix,
+.form-group.has-error .currency-field-input {
+  border-color: var(--danger-500);
+  background-color: var(--danger-50);
+}
+
+.form-group.has-error .form-input:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
 .currency-field {
   display: flex;
   align-items: stretch;

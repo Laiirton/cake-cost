@@ -107,7 +107,7 @@ export default function CurrencyInput(props: CurrencyInputProps) {
   }
 
   return (
-    <div className={`currency-field ${containerClassName}`.trim()} style={containerStyle}>
+    <div className={`currency-field ${containerClassName}`.trim()} style={{ ...containerStyle, position: 'relative' }}>
       <span className="currency-field-prefix">R$</span>
       <input
         {...inputProps}
@@ -122,6 +122,25 @@ export default function CurrencyInput(props: CurrencyInputProps) {
         autoComplete={autoComplete}
         spellCheck={spellCheck}
       />
+      {isFocused && draftValue !== null && draftValue !== '' && draftValue !== formatEditableValue(value) && (
+        <div 
+          className="currency-field-feedback"
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 10,
+            fontSize: '0.6875rem',
+            color: 'var(--brand-600)',
+            marginTop: 4,
+            fontWeight: 600,
+            pointerEvents: 'none'
+          }}
+        >
+          Interpretação: {formatCommittedValue(parseCurrencyInput(draftValue))}
+        </div>
+      )}
     </div>
   )
 }

@@ -195,7 +195,7 @@ async function copyTextToClipboard(value: string) {
   textarea.remove()
 
   if (!copied) {
-    throw new Error('Nao foi possivel copiar o resumo.')
+    throw new Error('Não foi possível copiar o resumo.')
   }
 }
 
@@ -225,7 +225,7 @@ function buildSummaryText(snapshot: SummarySnapshot): string {
   })
 
   if (snapshot.notes) {
-    lines.push('Observacoes')
+    lines.push('Observações')
     lines.push(snapshot.notes)
   }
 
@@ -276,7 +276,7 @@ function buildSummaryCsv(snapshot: SummarySnapshot): string {
   if (snapshot.notes) {
     rows.push(
       [
-        escapeCsvValue('Observacoes'),
+        escapeCsvValue('Observações'),
         escapeCsvValue('Modelo'),
         escapeCsvValue('Notas'),
         escapeCsvValue(''),
@@ -357,7 +357,7 @@ function buildSummaryPrintDocument(snapshot: SummarySnapshot): string {
     ? `
         <section class="sheet-card sheet-card-notes">
           <div class="sheet-card-header">
-            <h2>Observacoes</h2>
+            <h2>Observações</h2>
           </div>
           <p class="sheet-notes">${escapeHtml(snapshot.notes)}</p>
         </section>
@@ -646,7 +646,7 @@ function buildSummarySnapshot(params: {
     params.servingsTarget > 0
       ? params.servingsTarget
       : parseYieldToServings(params.selectedRecipe.yield_label || '')
-  const modelName = params.selectedPreset?.name || `Simulacao de ${params.selectedRecipe.name}`
+  const modelName = params.selectedPreset?.name || `Simulação de ${params.selectedRecipe.name}`
   const subtitleParts = [params.selectedRecipe.name]
   if (params.selectedRecipe.category) subtitleParts.push(params.selectedRecipe.category)
   if (params.selectedRecipe.size_label) subtitleParts.push(params.selectedRecipe.size_label)
@@ -971,7 +971,7 @@ export default function CalculadoraPage() {
     resetSimulation(selectedRecipeId)
     setPresetSearch('')
     setExpandedSections(getDefaultExpandedSections())
-    showToast('success', 'Simulacao reiniciada.')
+    showToast('success', 'Simulação reiniciada.')
   }, [resetSimulation, selectedRecipeId, showToast])
 
   const applyPreset = useCallback(
@@ -1341,7 +1341,7 @@ export default function CalculadoraPage() {
 
       <div className="page-header">
         <div>
-          <h1>Modelos e precos</h1>
+          <h1>Modelos e preços</h1>
           <p>Salve modelos prontos para vender sem recalcular tudo a cada pedido.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1395,7 +1395,7 @@ export default function CalculadoraPage() {
 
               <button type="button" className="btn btn-secondary btn-sm" onClick={startNewSimulation} style={{ width: '100%', marginBottom: 12 }}>
                 <Plus size={14} />
-                Nova simulacao
+                Nova simulação
               </button>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1420,7 +1420,7 @@ export default function CalculadoraPage() {
                         {selectedPresetId === preset.id && <span className="badge badge-brand">Ativo</span>}
                       </div>
                       <div className="text-xs text-muted" style={{ marginBottom: 8 }}>
-                        {recipe?.name || 'Receita removida'} {recipe?.category ? `• ${recipe.category}` : ''}
+                        {recipe?.name || 'Vínculo quebrado'} {recipe?.category ? `• ${recipe.category}` : ''}
                       </div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
                         <span className="badge badge-neutral">{preset.servings || parseYieldToServings(recipe?.yield_label || '')} porções</span>
@@ -1437,7 +1437,7 @@ export default function CalculadoraPage() {
 
           <div className="card">
             <div className="card-header">
-              <h3>Base da simulacao</h3>
+              <h3>Base da simulação</h3>
             </div>
             <div className="card-body">
               <div className="form-group">
@@ -1738,7 +1738,7 @@ export default function CalculadoraPage() {
               <div style={{ position: 'sticky', top: 'calc(var(--header-height) + 24px)' }}>
                 <div className="card" style={{ border: '2px solid var(--brand-200)' }}>
                   <div className="card-header" style={{ background: 'linear-gradient(135deg, var(--brand-50), var(--accent-50))' }}>
-                    <h3>Resumo do preco</h3>
+                    <h3>Resumo do preço</h3>
                   </div>
                   <div className="card-body" style={{ padding: 20 }}>
                     {pricing && (

@@ -149,6 +149,7 @@ export default function PedidosPage() {
   const [form, setForm] = useState<OrderFormState>(createEmptyForm([], []))
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set())
   const [queryApplied, setQueryApplied] = useState(false)
   const { toast, showToast } = useTransientToast()
 
@@ -272,6 +273,7 @@ export default function PedidosPage() {
       }
       setEditing(null)
       setFormError('')
+      setFieldErrors(new Set())
       setShowModal(true)
       setForm(nextForm)
     },
@@ -291,6 +293,7 @@ export default function PedidosPage() {
   const openEdit = (item: Order) => {
     setEditing(item)
     setFormError('')
+    setFieldErrors(new Set())
     setForm({
       customer_id: item.customer_id,
       preset_id: item.preset_id,
@@ -315,6 +318,7 @@ export default function PedidosPage() {
   const closeModal = () => {
     setShowModal(false)
     setFormError('')
+    setFieldErrors(new Set())
   }
 
   const handleAdvanceStatus = async (order: Order) => {
@@ -338,43 +342,40 @@ export default function PedidosPage() {
 
   const handleSave = async () => {
     const title = form.title.trim()
+    const errors = new Set<string>()
+
     if (!title) {
+      errors.add('title')
       setFormError('Informe o título do pedido.')
-      return
-    }
-
-    if (!form.customer_id) {
+    } else if (!form.customer_id) {
+      errors.add('customer_id')
       setFormError('Selecione um cliente.')
-      return
-    }
-
-    if (!form.preset_id) {
+    } else if (!form.preset_id) {
+      errors.add('preset_id')
       setFormError('Selecione um modelo.')
-      return
-    }
-
-    if (form.delivery_date && form.event_date && form.delivery_date > form.event_date) {
-      setFormError('A data de entrega não pode ser posterior à data do evento.')
-      return
-    }
-
-    if (!form.event_date) {
+    } else if (!form.event_date) {
+      errors.add('event_date')
       setFormError('Informe a data do evento.')
-      return
-    }
-
-    if (!form.delivery_date) {
+    } else if (!form.delivery_date) {
+      errors.add('delivery_date')
       setFormError('Informe a data de entrega.')
-      return
+    } else if (form.delivery_date && form.event_date && form.delivery_date > form.event_date) {
+      errors.add('delivery_date')
+      errors.add('event_date')
+      setFormError('A data de entrega não pode ser posterior à data do evento.')
+    } else if (form.deposit_amount > form.sale_price) {
+      errors.add('deposit_amount')
+      setFormError('O valor de entrada não pode ser maior que o valor total.')
     }
 
-    if (form.deposit_amount > form.sale_price) {
-      setFormError('O valor de entrada não pode ser maior que o valor total.')
+    if (errors.size > 0) {
+      setFieldErrors(errors)
       return
     }
 
     setSaving(true)
     setFormError('')
+    setFieldErrors(new Set())
 
     try {
       const supabase = await getBrowserClient()
@@ -428,6 +429,7 @@ export default function PedidosPage() {
     } catch (error) {
       const message = getErrorMessage(error, 'Erro ao salvar pedido')
       setFormError(message)
+      setFieldErrors(new Set(['submit']))
       showToast('error', message)
     } finally {
       setSaving(false)
@@ -702,27 +704,53 @@ export default function PedidosPage() {
               </div>
 
               {presetDraft && (
-                <div className="card" style={{ marginBottom: 16, boxShadow: 'none', borderColor: 'var(--brand-200)', background: 'linear-gradient(135deg, var(--brand-50), white)' }}>
+                <div 
+                  className="card" 
+                  style={{ 
+                    marginBottom: 16, 
+                    boxShadow: 'none', 
+                    borderColor: !selectedRecipe ? 'var(--danger-500)' : 'var(--brand-200)', 
+                    background: !selectedRecipe ? 'var(--danger-50)' : 'linear-gradient(135deg, var(--brand-50), white)' 
+                  }}
+                >
                   <div className="card-body" style={{ padding: 16 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                       <div>
-                        <div style={{ fontWeight: 800, marginBottom: 4 }}>{selectedPreset?.name}</div>
+                        <div style={{ fontWeight: 800, marginBottom: 4 }}>
+                          {selectedPreset?.name}
+                          {!selectedRecipe && <span className="badge badge-danger" style={{ marginLeft: 8 }}>RECEITA REMOVIDA</span>}
+                        </div>
                         <div className="text-sm text-muted">
-                          {selectedRecipe?.name || 'Receita removida'} {selectedRecipe?.size_label ? `• ${selectedRecipe.size_label}` : ''}
+                          {selectedRecipe?.name || 'O vínculo com a receita original foi quebrado.'} {selectedRecipe?.size_label ? `• ${selectedRecipe.size_label}` : ''}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div className="text-xs text-muted">Preço sugerido</div>
-                        <div style={{ fontWeight: 800, color: 'var(--brand-600)' }}>
+                        <div style={{ fontWeight: 800, color: !selectedRecipe ? 'var(--danger-600)' : 'var(--brand-600)' }}>
                           {formatCurrency(presetDraft.sale_price)}
                         </div>
                       </div>
                     </div>
+                    {!selectedRecipe && (
+                      <div 
+                        style={{ 
+                          marginTop: 12, 
+                          paddingTop: 12, 
+                          borderTop: '1px solid var(--danger-200)', 
+                          fontSize: '0.75rem', 
+                          color: 'var(--danger-700)',
+                          fontWeight: 600
+                        }}
+                      >
+                        ⚠️ ATENÇÃO: A receita deste modelo não existe mais. O valor sugerido pode estar defasado ou zerado (R$ 0,00). 
+                        Revise o valor total do pedido manualmente.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
-              <div className="form-group">
+              <div className={`form-group ${fieldErrors.has('title') ? 'has-error' : ''}`}>
                 <label className="form-label">Título do pedido</label>
                 <input
                   className="form-input"
@@ -743,7 +771,7 @@ export default function PedidosPage() {
               </div>
 
               <div className="form-row">
-                <div className="form-group">
+                <div className={`form-group ${fieldErrors.has('event_date') ? 'has-error' : ''}`}>
                   <label className="form-label">Data do evento</label>
                   <input
                     className="form-input"
@@ -751,8 +779,9 @@ export default function PedidosPage() {
                     value={form.event_date}
                     onChange={(event) => setForm((current) => ({ ...current, event_date: event.target.value }))}
                   />
+                  <div className="form-hint">Formato: dia / mês / ano</div>
                 </div>
-                <div className="form-group">
+                <div className={`form-group ${fieldErrors.has('delivery_date') ? 'has-error' : ''}`}>
                   <label className="form-label">Data de entrega</label>
                   <input
                     className="form-input"
@@ -760,6 +789,7 @@ export default function PedidosPage() {
                     value={form.delivery_date}
                     onChange={(event) => setForm((current) => ({ ...current, delivery_date: event.target.value }))}
                   />
+                  <div className="form-hint">Formato: dia / mês / ano</div>
                 </div>
               </div>
 
@@ -785,9 +815,9 @@ export default function PedidosPage() {
               </div>
 
               <div className="form-row">
-                <div className="form-group">
+                <div className={`form-group ${fieldErrors.has('sale_price') ? 'has-error' : ''}`}>
                   <label className="form-label">Valor total</label>
-                  <CurrencyInput value={form.sale_price} onChange={(value) => setForm((current) => ({ ...current, sale_price: value }))} />
+                  <CurrencyInput value={form.sale_price} onChange={(value) => setForm((current) => ({ ...current, sale_price: value || 0 }))} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Entrada recebida</label>

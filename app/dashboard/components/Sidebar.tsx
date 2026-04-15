@@ -18,7 +18,7 @@ import {
 
 const navItems = [
   {
-    section: 'Visao Geral',
+    section: 'Visão Geral',
     items: [
       { href: '/dashboard', label: 'Painel', icon: LayoutDashboard },
     ],
@@ -34,12 +34,12 @@ const navItems = [
   {
     section: 'Vendas',
     items: [
-      { href: '/dashboard/calculadora', label: 'Modelos e Precos', icon: Calculator },
+      { href: '/dashboard/calculadora', label: 'Modelos e Preços', icon: Calculator },
       { href: '/dashboard/pedidos', label: 'Pedidos', icon: ShoppingBag },
     ],
   },
   {
-    section: 'Operacao',
+    section: 'Operação',
     items: [
       { href: '/dashboard/producao', label: 'Produção', icon: ListChecks },
       { href: '/dashboard/financeiro', label: 'Financeiro', icon: DollarSign },

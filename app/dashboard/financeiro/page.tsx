@@ -218,6 +218,11 @@ export default function FinanceiroPage() {
       return
     }
 
+    if (!form.amount || (form.amount as number) <= 0) {
+      setFormError('O valor do lançamento deve ser maior que R$ 0,00.')
+      return
+    }
+
     setSaving(true)
     setFormError('')
 
@@ -591,6 +596,7 @@ export default function FinanceiroPage() {
                 <div className="form-group">
                   <label className="form-label">Data</label>
                   <input className="form-input" type="date" value={(form.occurred_on as string) || ''} onChange={(event) => setForm((current) => ({ ...current, occurred_on: event.target.value }))} />
+                  <div className="form-hint">Formato: dia / mês / ano</div>
                 </div>
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
