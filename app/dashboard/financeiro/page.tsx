@@ -6,6 +6,7 @@ import { DollarSign, Pencil, Plus, Search, Trash2, TrendingDown, TrendingUp, X }
 import { useTransientToast } from '@/lib/hooks/useTransientToast'
 import { getBrowserClient } from '@/lib/supabase/client'
 import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
+import DateInput from '@/app/dashboard/components/DateInput'
 import { formatCurrency, formatDate, getErrorMessage } from '@/lib/utils'
 import { getOrderRemainingBalance, getOrderTimelineDate, isPaymentOpen } from '@/lib/bakery'
 
@@ -593,11 +594,11 @@ export default function FinanceiroPage() {
                   <label className="form-label">Valor</label>
                   <CurrencyInput value={(form.amount as number) || 0} onChange={(value) => setForm((current) => ({ ...current, amount: value }))} />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Data</label>
-                  <input className="form-input" type="date" value={(form.occurred_on as string) || ''} onChange={(event) => setForm((current) => ({ ...current, occurred_on: event.target.value }))} />
-                  <div className="form-hint">Formato: dia / mês / ano</div>
-                </div>
+                <DateInput
+                  label="Data"
+                  value={(form.occurred_on as string) || ''}
+                  onChange={(val) => setForm((current) => ({ ...current, occurred_on: val }))}
+                />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Vincular a pedido (opcional)</label>

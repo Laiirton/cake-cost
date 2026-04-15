@@ -16,6 +16,7 @@ import {
 import { useTransientToast } from '@/lib/hooks/useTransientToast'
 import { getBrowserClient } from '@/lib/supabase/client'
 import CurrencyInput from '@/app/dashboard/components/CurrencyInput'
+import DateInput from '@/app/dashboard/components/DateInput'
 import { formatCurrency, formatDate, getErrorMessage, type Ingredient } from '@/lib/utils'
 import {
   buildOrderDraftFromPreset,
@@ -771,26 +772,18 @@ export default function PedidosPage() {
               </div>
 
               <div className="form-row">
-                <div className={`form-group ${fieldErrors.has('event_date') ? 'has-error' : ''}`}>
-                  <label className="form-label">Data do evento</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={form.event_date}
-                    onChange={(event) => setForm((current) => ({ ...current, event_date: event.target.value }))}
-                  />
-                  <div className="form-hint">Formato: dia / mês / ano</div>
-                </div>
-                <div className={`form-group ${fieldErrors.has('delivery_date') ? 'has-error' : ''}`}>
-                  <label className="form-label">Data de entrega</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={form.delivery_date}
-                    onChange={(event) => setForm((current) => ({ ...current, delivery_date: event.target.value }))}
-                  />
-                  <div className="form-hint">Formato: dia / mês / ano</div>
-                </div>
+                <DateInput
+                  label="Data do evento"
+                  value={form.event_date}
+                  onChange={(val) => setForm((current) => ({ ...current, event_date: val }))}
+                  hasError={fieldErrors.has('event_date')}
+                />
+                <DateInput
+                  label="Data de entrega"
+                  value={form.delivery_date}
+                  onChange={(val) => setForm((current) => ({ ...current, delivery_date: val }))}
+                  hasError={fieldErrors.has('delivery_date')}
+                />
               </div>
 
               <div className="form-row">

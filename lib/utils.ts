@@ -34,7 +34,9 @@ export function parseCurrency(value: string): number {
 export function formatDate(dateStr: string): string {
   if (!dateStr) return '-'
   try {
-    return new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR')
+    // Treat as UTC to avoid timezone shifts
+    const [y, m, d] = dateStr.split('-').map(Number)
+    return new Date(y, m - 1, d).toLocaleDateString('pt-BR')
   } catch {
     return dateStr
   }
@@ -202,18 +204,6 @@ export function getErrorMessage(error: unknown, fallback = 'Erro desconhecido'):
 /**
  * Calculate the cost of a recipe item based on ingredient purchase info.
  * cost = (quantity_used / purchase_quantity) × purchase_price
- *
- * Handles basic unit conversion:
- *  - If recipe uses "g" and ingredient is in "kg" → divide by 1000
- *  - If recipe uses "kg" and ingredient is in "g" → multiply by 1000
- *  - If recipe uses "ml" and ingredient is in "L" → divide by 1000
- *  - If recipe uses "L" and ingredient is in "ml" → multiply by 1000
- *  - If recipe uses "un" and ingredient is in "dz" → divide by 12
- *  - If recipe uses "dz" and ingredient is in "un" → multiply by 12
- *  - Otherwise assumes same unit
- *
- * NOTE: "colher" and "xíc" (household units) do not convert automatically
- * as their weights vary significantly by ingredient.
  */
 export function calculateItemCost(
   item: RecipeItem,
@@ -353,4 +343,37 @@ export function calculatePricing(params: {
  */
 export function uid(): string {
   return Math.random().toString(36).substring(2, 10)
+}
+
+/**
+ * Format string as date mask dd/mm/aaaa
+ */
+export function formatDateMask(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 8)
+  return digits
+    .replace(/(\d{2})(\d)/, '$1/$2')
+    .replace(/(\d{2})(\d{2})(\d)/, '$1/$2/$3')
+}
+
+/**
+ * Normalizes a dd/mm/aaaa string to yyyy-mm-dd
+ */
+export function normalizeDate(value: string): string {
+  const digits = value.replace(/\D/g, '')
+  if (digits.length !== 8) return ''
+  const d = digits.slice(0, 2)
+  const m = digits.slice(2, 4)
+  const y = digits.slice(4, 8)
+  return `${y}-${m}-${d}`
+}
+
+/**
+ * Converts yyyy-mm-dd to dd/mm/aaaa for input display
+ */
+export function toDateInputValue(value: string): string {
+  if (!value) return ''
+  const parts = value.split('-')
+  if (parts.length !== 3) return value
+  const [y, m, d] = parts
+  return `${d}/${m}/${y}`
 }

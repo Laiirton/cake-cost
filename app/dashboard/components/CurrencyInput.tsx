@@ -88,21 +88,38 @@ export default function CurrencyInput(props: CurrencyInputProps) {
 
   const handleFocus = (event: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(true)
-    setDraftValue(formatEditableValue(value))
+    // When focusing, we show the current value already formatted
+    setDraftValue(formatCommittedValue(value).replace('R$\u00a0', '').replace('R$', '').trim())
     userOnFocus?.(event)
   }
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const rawValue = event.target.value
-    setDraftValue(rawValue)
-    emitValue(rawValue)
+    
+    // Currency mask logic: treat input as digits and divide by 100
+    const digits = rawValue.replace(/\D/g, '')
+    if (!digits) {
+      setDraftValue('')
+      if (isNullable) (onChange as (v: number | null) => void)(null)
+      else (onChange as (v: number) => void)(0)
+      return
+    }
+
+    const numericValue = parseInt(digits, 10) / 100
+    const formatted = formatCommittedValue(numericValue).replace('R$\u00a0', '').replace('R$', '').trim()
+    
+    setDraftValue(formatted)
+    
+    if (isNullable) {
+      (onChange as (nextValue: number | null) => void)(numericValue)
+    } else {
+      (onChange as (nextValue: number) => void)(numericValue)
+    }
   }
 
   const handleBlur = (event: React.FocusEvent<HTMLInputElement>) => {
     setIsFocused(false)
-    const rawValue = draftValue ?? event.target.value
     setDraftValue(null)
-    emitValue(rawValue)
     userOnBlur?.(event)
   }
 
@@ -122,25 +139,7 @@ export default function CurrencyInput(props: CurrencyInputProps) {
         autoComplete={autoComplete}
         spellCheck={spellCheck}
       />
-      {isFocused && draftValue !== null && draftValue !== '' && draftValue !== formatEditableValue(value) && (
-        <div 
-          className="currency-field-feedback"
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 10,
-            fontSize: '0.6875rem',
-            color: 'var(--brand-600)',
-            marginTop: 4,
-            fontWeight: 600,
-            pointerEvents: 'none'
-          }}
-        >
-          Interpretação: {formatCommittedValue(parseCurrencyInput(draftValue))}
-        </div>
-      )}
+
     </div>
   )
 }
