@@ -15,6 +15,7 @@ import {
   LogOut,
   X,
 } from 'lucide-react'
+import Image from 'next/image'
 
 const navItems = [
   {
@@ -71,7 +72,21 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       {isOpen && <div className="mobile-overlay" onClick={onClose} />}
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">CC</div>
+          <div className="sidebar-logo-icon">
+            <Image 
+              src="/logo.png" 
+              alt="Logo" 
+              width={42} 
+              height={42} 
+              style={{ borderRadius: '50%' }}
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+                const parent = target.parentElement;
+                if (parent) parent.innerHTML = 'CC';
+              }}
+            />
+          </div>
           <div className="sidebar-logo-text">
             <h2>Cake Cost</h2>
             <span>Gestão de Confeitaria</span>
