@@ -354,34 +354,34 @@ export default function DashboardPage() {
           marginBottom: 24,
         }}
       >
-        <Link href="/dashboard/pedidos?new=1" className="card" style={{ padding: 20 }}>
+        <Link href="/dashboard/pedidos?new=1" className="quick-action-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <ShoppingBag size={20} />
-            <ArrowRight size={16} />
+            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-lg)', background: 'var(--brand-50)', color: 'var(--brand-500)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><ShoppingBag size={18} /></div>
+            <ArrowRight size={16} style={{ color: 'var(--text-tertiary)' }} />
           </div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Criar novo pedido</div>
           <div className="text-sm text-muted">Comece por cliente e modelo para preencher o pedido com menos digitação.</div>
         </Link>
-        <Link href="/dashboard/calculadora" className="card" style={{ padding: 20 }}>
+        <Link href="/dashboard/calculadora" className="quick-action-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Calculator size={20} />
-            <ArrowRight size={16} />
+            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-lg)', background: 'var(--accent-50)', color: 'var(--accent-500)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Calculator size={18} /></div>
+            <ArrowRight size={16} style={{ color: 'var(--text-tertiary)' }} />
           </div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Criar ou revisar modelo</div>
           <div className="text-sm text-muted">Centralize precificação, embalagem, entrega e extras antes de vender.</div>
         </Link>
-        <Link href="/dashboard/producao" className="card" style={{ padding: 20 }}>
+        <Link href="/dashboard/producao" className="quick-action-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Clock size={20} />
-            <ArrowRight size={16} />
+            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-lg)', background: 'var(--success-50)', color: 'var(--success-500)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={18} /></div>
+            <ArrowRight size={16} style={{ color: 'var(--text-tertiary)' }} />
           </div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Ver produção</div>
           <div className="text-sm text-muted">Acompanhe atrasos, itens de hoje e gargalos por estação.</div>
         </Link>
-        <Link href="/dashboard/financeiro" className="card" style={{ padding: 20 }}>
+        <Link href="/dashboard/financeiro" className="quick-action-card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <DollarSign size={20} />
-            <ArrowRight size={16} />
+            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-lg)', background: '#eef2ff', color: '#6366f1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><DollarSign size={18} /></div>
+            <ArrowRight size={16} style={{ color: 'var(--text-tertiary)' }} />
           </div>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>Cobrar e registrar</div>
           <div className="text-sm text-muted">Separe o que foi vendido do que entrou no caixa para não se perder.</div>

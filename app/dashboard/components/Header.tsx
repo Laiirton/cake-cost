@@ -9,7 +9,7 @@ interface HeaderProps {
 
 export default function Header({ onMenuClick, userEmail }: HeaderProps) {
   const initials = userEmail
-    ? userEmail.substring(0, 2).toUpperCase()
+    ? userEmail.substring(0, 1).toUpperCase()
     : 'U'
 
   return (

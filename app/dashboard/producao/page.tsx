@@ -307,7 +307,7 @@ export default function ProducaoPage() {
                   const previousStatus = statusOptions[currentIndex - 1]?.value
                   const nextStatus = statusOptions[currentIndex + 1]?.value
                   return (
-                    <div key={item.id} className="card" style={{ padding: 16, boxShadow: 'none', borderRadius: 'var(--radius-lg)' }}>
+                    <div key={item.id} className="inner-card" style={{ padding: 16 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 10 }}>
                         <div style={{ fontWeight: 800, fontSize: '0.9375rem' }}>{item.title}</div>
                         <button className="btn btn-ghost btn-icon btn-sm" onClick={() => openEdit(item)}>

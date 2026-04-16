@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Eye, EyeOff, Cake } from 'lucide-react'
 import { login } from './actions'
 
 export default function LoginPage() {
@@ -21,7 +22,9 @@ export default function LoginPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="login-icon">🧁</div>
+        <div className="login-icon">
+          <Cake size={32} />
+        </div>
         <h1>Cake Cost</h1>
         <p className="login-subtitle">Faça login para acessar seu painel de gestão</p>
 
@@ -67,8 +70,7 @@ export default function LoginPage() {
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
-                  color: 'var(--muted-foreground, #9ca3af)',
-                  fontSize: '1.1rem',
+                  color: 'var(--gray-400)',
                   padding: '4px',
                   lineHeight: 1,
                   display: 'flex',
@@ -76,10 +78,11 @@ export default function LoginPage() {
                   justifyContent: 'center',
                   borderRadius: '4px',
                   outline: 'none',
+                  transition: 'color 150ms ease',
                 }}
                 onMouseDown={(e) => e.preventDefault()}
               >
-                {showPassword ? '👁️‍🗨️' : '👁️'}
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
             </div>
           </div>

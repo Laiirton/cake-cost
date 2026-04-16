@@ -260,7 +260,7 @@ export default function ReceitasPage() {
               sectionCounts[sec.key] = recipe.items.filter(i => i.section === sec.key).length
             }
             return (
-              <div key={recipe.id} className="card" style={{ cursor: 'pointer' }} onClick={() => openEdit(recipe)}>
+              <div key={recipe.id} className="card recipe-card" onClick={() => openEdit(recipe)}>
                 <div className="card-body" style={{ padding: '20px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
                       <div>

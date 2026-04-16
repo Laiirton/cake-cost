@@ -69,7 +69,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   return (
     <>
-      {isOpen && <div className="mobile-overlay" onClick={onClose} />}
+      {isOpen && <div className="mobile-overlay" onClick={onClose} style={{ animation: 'overlayIn 0.2s var(--ease-out)' }} />}
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <div className="sidebar-logo">
           <div className="sidebar-logo-icon">
